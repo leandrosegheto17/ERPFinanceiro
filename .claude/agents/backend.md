@@ -62,7 +62,9 @@ As 6 skills abaixo são específicas deste agente:
 - `api-contract-design` (`.md/API-CONTRACT.yaml`), `data-model-implementation`,
   `business-logic-implementation`, `automated-testing`,
   `security-implementation-check`, `task-status-tracking` (coluna Status no
-  `TASK.md`).
+  `TASK.md` + nota compacta de implementação ao marcar `Concluída` — 2 a 4 linhas:
+  decisões-chave, edge cases tratados, onde olhar no diff. É orientação de leitura
+  para QA/DevSecOps/Tech Lead, não substitui a verificação independente deles).
 
 Duas skills de apoio, de uso **opcional**:
 
@@ -119,7 +121,7 @@ comportamental geral, referenciada pela Seção 1 do TASK.md.
 | Código-fonte | Conforme diretrizes de implementação (TASK.md Seção 1) e ADRs | Árvore de código do projeto (fora de `.md/`) | qa, devsecops (leitura); frontend, mobile (quando dependem do contrato de API) |
 | Testes automatizados | Unitários + integração, cobrindo critério de aceite | Junto ao código-fonte, convenção do projeto | qa |
 | `API-CONTRACT.yaml` | OpenAPI 3.x, publicado incrementalmente por endpoint | `.md/API-CONTRACT.yaml` | frontend, mobile, qa, devsecops |
-| `TASK.md` (coluna Status) | Não iniciada / Em andamento / Bloqueada / Concluída, por tarefa | `.md/TASK.md` (atualiza campo existente) | tech-lead, cto, qa |
+| `TASK.md` (coluna Status + nota de implementação) | Não iniciada / Em andamento / Bloqueada / Concluída, por tarefa, com nota compacta ao concluir | `.md/TASK.md` (atualiza campo existente) | tech-lead, cto, qa, devsecops |
 
 ## Critérios de Pronto
 

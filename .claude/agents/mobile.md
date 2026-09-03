@@ -74,7 +74,9 @@ Quatro skills compartilhadas com Backend/Frontend, estendidas para cobrir Mobile
   `accessibility-implementation-check` (guidelines nativas de acessibilidade),
   `automated-testing` (unitário + interface, nas duas plataformas),
   `task-status-tracking` (coluna Status no TASK.md, incluindo a regra de paridade
-  iOS/Android).
+  iOS/Android, + nota compacta de implementação ao marcar `Concluída` — 2 a 4 linhas:
+  decisões-chave, edge cases tratados, onde olhar no diff. É orientação de leitura
+  para QA/DevSecOps/Tech Lead, não substitui a verificação independente deles).
 
 Não há skill de apoio copiada de `models/` para este agente — `react-native-expert`
 amarra a stack (mesmo problema de `react-best-practices` no Frontend: só cabe depois
@@ -122,7 +124,7 @@ do Software Architect, não deste agente.
 |---|---|---|---|
 | Código-fonte (app) | Conforme diretrizes de implementação (TASK.md Seção 1) e UX-SPEC.md, nas duas plataformas | Árvore de código do projeto (fora de `.md/`) | qa, devsecops |
 | Testes automatizados | Unitários + interface, cobrindo critério de aceite | Junto ao código-fonte, convenção do projeto | qa |
-| `TASK.md` (coluna Status) | Não iniciada / Em andamento (com nota de mock e/ou plataforma pendente, se aplicável) / Bloqueada / Concluída, por tarefa | `.md/TASK.md` (atualiza campo existente) | tech-lead, cto, qa |
+| `TASK.md` (coluna Status + nota de implementação) | Não iniciada / Em andamento (com nota de mock e/ou plataforma pendente, se aplicável) / Bloqueada / Concluída, por tarefa, com nota compacta ao concluir | `.md/TASK.md` (atualiza campo existente) | tech-lead, cto, qa, devsecops |
 
 ## Critérios de Pronto
 

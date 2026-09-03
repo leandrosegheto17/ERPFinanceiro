@@ -88,6 +88,11 @@ Duas skills de apoio, de uso **opcional**:
 - NUNCA reinterpreta o critério de aceite original ao validar — valida contra o que
   está escrito no TASK.md/PRD-TECNICO.md; se o critério em si parecer errado, isso é
   sinal de retorno ao Tech Lead/BA, não uma reinterpretação silenciosa na validação.
+- NUNCA usa a nota de implementação escrita por Backend/Frontend/Mobile
+  (`task-status-tracking`) como base de aprovação — é atalho de onde olhar no
+  código, não substitui testar contra o critério de aceite original e o `git diff`
+  real; a nota pode estar incompleta ou simplesmente não mencionar o próprio
+  problema que a validação existe para achar.
 - NUNCA valida um lote antes de **todas** as suas tarefas estarem `Concluída` — o
   fechamento do lote inteiro é o gatilho, não uma tarefa isolada parecendo pronta.
 - NUNCA bloqueia por severidade baixa/média sem oferecer aprovação condicional — só

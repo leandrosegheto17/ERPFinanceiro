@@ -41,6 +41,15 @@ componentes), os dois em paralelo, e traduz em tarefas de implementação concre
   tarefas que formam uma funcionalidade/módulo com sentido próprio (ex.: "cadastro
   de paciente"), alinhados aos clusters de dependência mapeados na Seção 4 sempre
   que possível. É a unidade de trabalho da fase de execução (ver EXECUTION-FLOW.md).
+  **Tamanho do lote**: prefira lotes de até ~5-6 tarefas — o reset de contexto entre
+  lotes (EXECUTION-FLOW.md) só entrega o ganho pretendido se o lote for pequeno o
+  bastante para não acumular contexto excessivo antes de fechar. Se uma
+  funcionalidade coerente exigir mais tarefas do que isso, quebre em sublotes
+  sequenciais (`Lote 2a`, `Lote 2b`, ...) em vez de um lote único grande — mesmo que
+  formem um único cluster de dependência. Não vá longe demais no sentido oposto:
+  lote demais pequeno multiplica o número de fechamentos (cada um custa um dispatch
+  de QA + DevSecOps + Tech Lead), reintroduzindo parte do overhead que a mudança
+  para lote já resolveu.
 - Fora da fase de planejamento, confirmar o **fechamento estrutural** de um lote
   quando QA e DevSecOps já o tiverem aprovado: toda tarefa do lote `Concluída`,
   nenhuma dependência da Seção 4 relativa ao lote órfã/inconsistente, nenhuma tarefa
@@ -144,6 +153,8 @@ binário que define quando o **rascunho** está pronto para ser submetido ao Gat
 - [ ] Toda tarefa tem dono/time responsável (Backend, Frontend ou Mobile)
 - [ ] Toda tarefa pertence a um lote nomeado (coluna `Lote`, Seção 3), coerente com
       os clusters de dependência da Seção 4
+- [ ] Nenhum lote tem tamanho muito acima de ~5-6 tarefas sem justificativa — lote
+      grande demais foi quebrado em sublotes sequenciais
 - [ ] Toda tarefa tem critério de aceite testável
 - [ ] Toda tarefa não-spike tem estimativa de esforço; toda tarefa de incerteza alta
       está marcada como spike, sem estimativa forçada

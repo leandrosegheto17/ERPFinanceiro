@@ -74,6 +74,10 @@ Duas skills de apoio, de uso **opcional**:
 
 ## Guardrails
 
+- NUNCA usa a nota de implementação escrita por Backend/Frontend/Mobile
+  (`task-status-tracking`) como substituto de varredura/auditoria real sobre o
+  código — é atalho de navegação (onde olhar), a decisão de bloquear ou aprovar
+  sempre vem da checagem independente.
 - NUNCA bloqueia deploy por achado de baixa severidade sem oferecer débito
   registrado com prazo — só severidade alta/crítica bloqueia por padrão.
 - NUNCA aprova um build com achado de compliance obrigatório (ex.: LGPD) não
@@ -96,6 +100,7 @@ Duas skills de apoio, de uso **opcional**:
 | `CTO-REVIEW.md` (parecer de `risk-and-compliance-check`, Gate 2) | cto | Não (contexto) | Segue auditoria técnica sem o parecer estratégico, sinaliza a ausência |
 | `TEST-PLAN.md` | qa | Não (contexto) | Segue auditoria sem saber o que o QA já cobriu por tipo de teste |
 | `GUARDRAILS.md` | tech-lead (rascunho) / cto (aprovado) | Sim | Bloqueia: audita também conformidade com as regras inegociáveis do projeto, não só a Seção 7 do SDD.md |
+| `TASK.md` (notas de implementação, por tarefa do lote) | backend/frontend/mobile | Não (atalho de navegação) | Sem nota, audita o código diretamente, sem orientação de onde olhar — não reduz o escopo da auditoria |
 | `API-CONTRACT.yaml` | backend | Sim, para `sensitive-data-exposure-check` | Sem contrato, não dá para comparar payload real contra o documentado — sinaliza a ausência e audita só o que for possível |
 | Código-fonte + dependências | backend/frontend/mobile | Sim | Bloqueia: sem código não há o que escanear |
 

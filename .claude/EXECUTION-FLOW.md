@@ -39,6 +39,11 @@ funcionalidade/módulo com sentido próprio (ex.: "cadastro de paciente").
   clusters de dependência que ele já mapeia na Seção 4 — um lote é, sempre que
   possível, um componente conectado no grafo de dependências, não um corte
   arbitrário.
+- **Tamanho**: o reset de contexto abaixo só entrega o ganho pretendido se o lote
+  for pequeno o bastante para não acumular contexto excessivo antes de fechar — o
+  Tech Lead segue um teto prático de ~5-6 tarefas por lote, quebrando funcionalidade
+  grande em sublotes sequenciais quando preciso (critério completo em
+  `tech-lead.md`).
 - **O que opera em nível de lote**: as 3 trilhas de implementação (dentro do lote,
   tarefas em sequência), a revisão spec-compliance + qualidade pós-tarefa, a bateria
   completa de QA, a auditoria completa do DevSecOps, o fechamento estrutural do Tech

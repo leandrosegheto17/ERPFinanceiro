@@ -64,7 +64,10 @@ As 6 skills abaixo são específicas deste agente:
 
 - `ui-implementation`, `api-integration` (mock-aware), `responsive-implementation`,
   `accessibility-implementation-check`, `automated-testing`,
-  `task-status-tracking` (coluna Status no `TASK.md`, mock-aware).
+  `task-status-tracking` (coluna Status no `TASK.md`, mock-aware, + nota compacta de
+  implementação ao marcar `Concluída` — 2 a 4 linhas: decisões-chave, edge cases
+  tratados, onde olhar no diff. É orientação de leitura para QA/DevSecOps/Tech Lead,
+  não substitui a verificação independente deles).
 
 Duas skills de apoio, de uso **opcional**, dentro de `ui-implementation`:
 
@@ -116,7 +119,7 @@ comportamental geral.
 |---|---|---|---|
 | Código-fonte (interface) | Conforme diretrizes de implementação (TASK.md Seção 1) e UX-SPEC.md | Árvore de código do projeto (fora de `.md/`) | qa, devsecops |
 | Testes automatizados | Unitários + componente, cobrindo critério de aceite | Junto ao código-fonte, convenção do projeto | qa |
-| `TASK.md` (coluna Status) | Não iniciada / Em andamento (com nota de mock, se aplicável) / Bloqueada / Concluída, por tarefa | `.md/TASK.md` (atualiza campo existente) | tech-lead, cto, qa |
+| `TASK.md` (coluna Status + nota de implementação) | Não iniciada / Em andamento (com nota de mock, se aplicável) / Bloqueada / Concluída, por tarefa, com nota compacta ao concluir | `.md/TASK.md` (atualiza campo existente) | tech-lead, cto, qa, devsecops |
 
 ## Critérios de Pronto
 

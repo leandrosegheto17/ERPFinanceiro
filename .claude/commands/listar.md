@@ -41,8 +41,9 @@ Para cada lote identificado, na ordem do documento:
 - **Validado**: todas as tarefas `Concluída` **e** o Validador aprovou
   funcionalmente (`QA-REPORT.md`, Aprovado/Aprovado com ressalvas) **e** aprovou
   em segurança (`SECURITY-REVIEW.md`, Aprovado/Aprovado com débito) **e** o
-  Coordenador confirmou a checagem estrutural — pronto para `/deploy`, mas ainda
-  não publicado.
+  próprio Validador confirmou a checagem estrutural (rotina que ele resolve
+  sozinho, sem precisar do Coordenador — ver EXECUTION-FLOW.md, Comando 2) —
+  pronto para `/deploy`, mas ainda não publicado.
 - **Bloqueado**: há entrada `Aberto` em `BLOCKERS.md` afetando alguma tarefa do
   lote — reporta independente do que os outros critérios indicariam.
 - **Em andamento**: alguma tarefa `Concluída` ou `Em andamento`, mas o lote não se

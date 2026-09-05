@@ -1,15 +1,24 @@
 ---
-description: Aciona o agente Validador (chapéus QA e DevSecOps) sobre um lote com todas as tarefas Concluída, seguido de uma checagem estrutural do Coordenador. Marca o lote como Validado (ou Validado com ressalvas); achado simples/débito baixo-médio vira tarefa em Refatoração Lote-X ao final da fila, sem parar — só achado crítico para o comando. --continuar encadeia todos os lotes já prontos, sem esperar; combine com /loop para checar periodicamente. Não publica nada.
+description: Aciona o agente Validador (chapéus QA e DevSecOps), que também resolve sozinho a checagem estrutural do lote (sem reabrir o Coordenador) sobre um lote com todas as tarefas Concluída. Marca o lote como Validado (ou Validado com ressalvas); achado simples/débito baixo-médio vira tarefa em Refatoração Lote-X ao final da fila, sem parar — só achado crítico, ou inconsistência estrutural que exija redesenho, para o comando (e aí sim escala ao Coordenador). --continuar encadeia todos os lotes já prontos, sem esperar; combine com /loop para checar periodicamente. Não publica nada.
 argument-hint: [vazio = próximo lote elegível | nome do lote = valida esse lote | --continuar [N] = encadeia lotes já prontos]
 ---
 
-# Comando `/validar` — Validador (QA + DevSecOps) + Coordenador (estrutural)
+# Comando `/validar` — Validador (QA + DevSecOps + checagem estrutural)
 
 A lógica deste comando está definida em `.claude/EXECUTION-FLOW.md` (Comando 2) —
 leia esse arquivo agora, antes de fazer qualquer outra coisa, se ainda não o tiver
 em contexto. Ele por sua vez assume o que está declarado em
 `.claude/agents/validador.md`, `.claude/agents/coordenador.md` e em
 `PIPELINE-CONVENTIONS.md`.
+
+**Nota importante**: a checagem estrutural (Seção 4) não dispara mais o
+`coordenador` por rotina — o próprio `validador` confirma o fechamento do lote e
+cria a `Refatoração Lote-X` quando precisa, na mesma chamada. Reabrir o
+Coordenador por essa confirmação de rotina custava contexto (ele entra com escopo
+limpo — ver `PIPELINE-CONVENTIONS.md` §2) sem agregar nada que o Validador já não
+soubesse. O `coordenador` só volta a ser acionado (via `BLOCKERS.md`) quando a
+checagem encontrar uma inconsistência real que exija redesenho de
+dependência/decomposição — não para confirmar o óbvio.
 
 **O usuário é o orquestrador.** Este comando roda a validação de um lote (ou de
 todos os já prontos, em `--continuar`) e para — não dispara `/executar` (em caso
@@ -77,22 +86,30 @@ pare (em modo padrão) ou encerre normalmente (em `--continuar`, ver Seção 0).
    atendido): **pare**. Explique o achado e informe que o próximo passo é rodar
    `/executar` sobre a tarefa afetada (campo "Escala para" do `validador.md`).
 
-## 4. Checagem estrutural (Coordenador)
+## 4. Checagem estrutural (o próprio Validador, sem dispatch)
 
-1. **Dispare** `coordenador` (`subagent_type: coordenador`) para confirmar
-   consistência do lote no `TASK.md`: toda tarefa `Concluída`, nenhuma dependência
-   da Seção 4 órfã/inconsistente, nenhuma tarefa `Bloqueada` sem resolução.
-2. **Se as Seções 2 ou 3 produziram reprovação simples/débito não bloqueante**: na
-   mesma chamada, o `coordenador` cria (ou adiciona tarefa a) o lote `Refatoração
-   Lote-X` na Seção 3 do `TASK.md` (X = o lote-alvo atual), posicionado depois de
-   todos os lotes existentes na ordem de execução — uma tarefa por achado,
-   referenciando a entrada do `QA-REPORT.md`/`SECURITY-REVIEW.md` que a originou.
-   O lote-alvo **não** é reaberto por causa disso.
-3. **Consistente** (sem inconsistência estrutural além do item 2, se aplicável):
-   siga para a Seção 5.
-4. **Inconsistência estrutural** (além do item 2): **pare**, explique se é
-   correção direta no `TASK.md` ou pendência de implementação (volta para
-   `/executar`).
+Sem disparar outro agente: com o `TASK.md` e os relatórios que acabou de produzir
+(`QA-REPORT.md`, `SECURITY-REVIEW.md`), o próprio `validador` confirma o
+fechamento do lote.
+
+1. Confirme: toda tarefa `Concluída`, nenhuma dependência da Seção 4 órfã/
+   inconsistente relativa a este lote, nenhuma tarefa `Bloqueada` sem resolução.
+2. **Se as Seções 2 ou 3 produziram reprovação simples/débito não bloqueante**:
+   crie (ou adicione tarefa a) o lote `Refatoração Lote-X` na Seção 3 do
+   `TASK.md` (X = o lote-alvo atual), posicionado depois de todos os lotes
+   existentes na ordem de execução — uma tarefa por achado, referenciando a
+   entrada do `QA-REPORT.md`/`SECURITY-REVIEW.md` que a originou. O lote-alvo
+   **não** é reaberto por causa disso. (Uso restrito das skills de decomposição
+   — `task-decomposition`, `dependency-sequencing`, `task-md-drafting` — só para
+   esta tarefa pontual, nunca para redecompor um lote inteiro; ver
+   `validador.md`.)
+3. **Consistente** (mecânico, sem necessidade de redesenho): siga para a
+   Seção 5.
+4. **Inconsistência que exige redesenho de dependência/decomposição real** (não
+   é mera confirmação de rotina): **só aqui** volte a depender de outro agente —
+   **pare**, registre em `BLOCKERS.md` escalando para `coordenador`
+   (PIPELINE-CONVENTIONS.md §4), e informe se é correção direta no `TASK.md` ou
+   pendência de implementação (volta para `/executar` depois de resolvido).
 
 ## 5. Encerramento
 

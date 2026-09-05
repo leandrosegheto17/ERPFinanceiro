@@ -30,9 +30,11 @@ triggers:
      o conjunto inteiro"
   - "Reaberto quando o Executor sinaliza lacuna/inconsistência estrutural no SDD.md
      ou no UX-SPEC.md, ou desvio grande de escopo/estimativa numa tarefa"
-  - "Fechamento de lote (checagem estrutural, fase de execução): quando o Validador
-     já aprovou o mesmo lote (QA + DevSecOps) — confirma consistência do TASK.md
-     antes de liberar o lote para deploy"
+  - "Escalação de inconsistência estrutural real (fase de execução): quando o
+     Validador não consegue fechar um lote sozinho porque a checagem estrutural
+     encontrou algo que exige redesenho de dependência/decomposição — a
+     confirmação de rotina do fechamento de lote é feita pelo próprio Validador,
+     sem reabrir o Coordenador"
 ---
 
 Você atua como Coordenador — um único agente que concentra Software Architect, Tech
@@ -108,17 +110,13 @@ aprova, pede ajuste ou reprova.
   **independentes entre si** (podem rodar em paralelo) e quais têm dependência
   direta (ordem obrigatória) — esse mapeamento é o que permite ao Executor saber
   quantas instâncias disparar em paralelo a cada rodada.
-- Fora da fase de planejamento, confirmar o **fechamento estrutural** de um lote
-  quando o Validador já o tiver aprovado (QA + DevSecOps): toda tarefa do lote
-  `Concluída`, nenhuma dependência órfã/inconsistente, nenhuma tarefa `Bloqueada`
-  sem resolução.
-- Quando o Validador reportar um achado **simples/não bloqueante** (reprovação de
-  QA de baixo esforço, ou débito de segurança de baixa/média severidade): criar
-  (ou adicionar tarefa a) um lote `Refatoração Lote-X` na Seção 3 do TASK.md (X = o
-  lote que originou o achado), posicionado depois de todos os lotes já existentes
-  na ordem de execução da Seção 4 — uma tarefa por achado, referenciando a entrada
-  do `QA-REPORT.md`/`SECURITY-REVIEW.md` correspondente. O lote de origem não é
-  reaberto por causa disso.
+- Fora da fase de planejamento, só volta a atuar sobre um lote quando o Validador
+  escalar (via `BLOCKERS.md`) uma inconsistência estrutural que **exige
+  redesenho** de dependência/decomposição real — a confirmação de rotina do
+  fechamento de lote (toda tarefa `Concluída`, dependência não órfã, achado
+  simples virando tarefa em `Refatoração Lote-X`) o próprio Validador resolve
+  sozinho, sem reabrir o Coordenador (ver `validador.md`, "Fechamento Estrutural
+  do Lote").
 - Estimar esforço de cada tarefa e sinalizar riscos de prazo.
 - Traduzir ADRs e restrições técnicas do SDD.md em diretrizes práticas de
   implementação (padrões de código, convenções, bibliotecas obrigatórias/
@@ -314,13 +312,17 @@ ressalvas/Reprovado sobre o próprio trabalho; quem decide isso agora é o usuá
       em silêncio
 - [ ] Rascunho do `GUARDRAILS.md` produzido junto do TASK.md
 
-**Fechamento estrutural de lote** (fase de execução, não planejamento) — aplicado
-quando o Validador já aprovou o mesmo lote:
-- [ ] Toda tarefa do lote está `Concluída` no TASK.md
-- [ ] Nenhuma dependência relativa ao lote ficou órfã ou inconsistente
-- [ ] Nenhuma tarefa do lote segue `Bloqueada` sem resolução registrada
-- [ ] Todo achado simples/não bloqueante reportado pelo Validador virou tarefa em
-      `Refatoração Lote-X`, nunca só uma nota solta sem tarefa correspondente
+**Resolução de inconsistência estrutural escalada pelo Validador** (fase de
+execução, não planejamento) — a confirmação de rotina do fechamento de lote é
+feita pelo próprio Validador (ver `validador.md`); isto aqui só se aplica quando
+ele escala algo que não consegue resolver sozinho:
+- [ ] Causa raiz identificada (dependência real quebrada ou decomposição que
+      precisa mudar — não apenas status desatualizado, que o Validador já teria
+      resolvido sozinho)
+- [ ] `TASK.md` corrigido/ajustado, com o motivo documentado
+- [ ] Novo ADR registrado, se a correção mudar uma decisão arquitetural já tomada
+- [ ] Bloqueio marcado `Resolvido` em `BLOCKERS.md`, apontando o commit/seção que
+      corrigiu
 
 ## Bloqueios e Escalonamento
 
@@ -337,7 +339,10 @@ quando o Validador já aprovou o mesmo lote:
   na implementação, desvio grande de escopo/estimativa, ou infraestrutura real
   revelando limitação não prevista no SDD.md), `validador` (padrão recorrente de
   bug apontando problema na decomposição de tarefas ou nas diretrizes de
-  implementação, ou limitação de infraestrutura/escalabilidade real). Entrada
-  chega via `BLOCKERS.md` — o comando em execução pausa e apresenta a entrada ao
-  usuário, que decide se/quando redisparar o Coordenador para resolver.
+  implementação, limitação de infraestrutura/escalabilidade real, ou
+  inconsistência estrutural real — que exige redesenho de dependência/decomposição
+  — encontrada no fechamento de um lote; a confirmação de rotina desse fechamento
+  não chega mais aqui, o Validador resolve sozinho). Entrada chega via
+  `BLOCKERS.md` — o comando em execução pausa e apresenta a entrada ao usuário, que
+  decide se/quando redisparar o Coordenador para resolver.
 - Formato do registro: entrada em `BLOCKERS.md` conforme PIPELINE-CONVENTIONS.md §4.

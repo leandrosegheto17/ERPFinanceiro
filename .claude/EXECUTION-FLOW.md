@@ -9,10 +9,13 @@ Este documento cobre a lógica dos **três comandos** da fase de execução —
 `/executar` (Executor implementa), `/validar` (Validador audita um lote fechado) e
 `/deploy` (Validador publica) — e do comando somente-leitura `/listar`. Nenhum dos
 três dispara o próximo automaticamente: **o usuário é o orquestrador**, decide
-quando rodar cada um. Este documento não redefine os agentes consolidados
-(`.claude/agents/gestor.md`, `coordenador.md`, `executor.md`, `validador.md`) nem a
-convenção de artefatos (`PIPELINE-CONVENTIONS.md`) — só ordena o que cada um já
-declara, em nível de comando.
+quando rodar cada um. **Exceção documentada**: `/executar --continuar` passa a
+rodar a validação (Comando 2) de cada lote automaticamente assim que ele fecha,
+antes de seguir para o próximo — ver Comando 1, Seção 3. Fora disso, o comando
+seguinte continua sendo decisão do usuário. Este documento não redefine os agentes
+consolidados (`.claude/agents/gestor.md`, `coordenador.md`, `executor.md`,
+`validador.md`) nem a convenção de artefatos (`PIPELINE-CONVENTIONS.md`) — só
+ordena o que cada um já declara, em nível de comando.
 
 > Modelo anterior (12 agentes, um único `/executar` que fazia implementação + QA +
 > DevSecOps + DevOps encadeados por lote) descontinuado — ver nota no topo de
@@ -45,8 +48,10 @@ de paciente"), atribuído pelo Coordenador durante a decomposição
   fixo de "3 trilhas" (Backend/Frontend/Mobile); o teto real é "toda tarefa
   elegível da rodada", respeitando o tamanho do lote (~5-6) como limite prático de
   paralelismo simultâneo.
-- **O que opera em nível de lote**: `/executar` (implementação), `/validar`
-  (auditoria QA + DevSecOps + checagem estrutural do Coordenador).
+- **O que opera em nível de lote**: `/executar` (implementação, e com
+  `--continuar` também a validação de cada lote assim que fecha), `/validar`
+  (auditoria QA + DevSecOps + checagem estrutural — hoje resolvida pelo próprio
+  Validador, sem reabrir o Coordenador, salvo escalação real — ver Comando 2).
 - **O que opera em nível de projeto** (não de lote): `/deploy` pode processar um
   lote específico ou o conjunto de lotes já validados e ainda não publicados — ver
   comando 3.
@@ -58,7 +63,7 @@ tarefa
 
 | Dispara quando | Agente | Ação | Pausa obrigatória |
 |---|---|---|---|
-| Usuário roda `/executar` sobre um `TASK.md` com tarefas pendentes | `executor` (múltiplas instâncias em paralelo, por tarefa elegível) | Implementa, testa (TDD), atualiza Status no TASK.md | Reprovação da revisão inline após 2 tentativas; desvio grande de escopo sinalizado pelo Executor; fim do lote-alvo |
+| Usuário roda `/executar` sobre um `TASK.md` com tarefas pendentes (`--continuar [N]` encadeia lotes e já valida cada um ao fechar) | `executor` (múltiplas instâncias em paralelo, por tarefa elegível); em `--continuar`, também `validador` (validação do lote que acabou de fechar) | Implementa, testa (TDD), atualiza Status no TASK.md; em `--continuar`, valida o lote (Comando 2) antes de seguir | Reprovação da revisão inline após 2 tentativas; desvio grande de escopo sinalizado pelo Executor; reprovação **crítica** de QA ou achado alto/crítico de DevSecOps na validação automática; fim do lote-alvo (modo padrão) |
 
 ### 1. Determinar o lote-alvo
 
@@ -114,25 +119,42 @@ reportado):
 
 1. Apresente um resumo: tarefas concluídas, tarefas bloqueadas (se houver), e o
    estado do lote.
-2. Informe que o lote está pronto para `/validar` — **não dispare o Validador
-   automaticamente**, isso é decisão do usuário.
-3. **Pare aqui.** Se `$ARGUMENTS` não pediu processamento de outro lote em
-   sequência, termine a resposta. Rodar `/executar` de novo (sem argumento, ou
-   nomeando o próximo lote) é decisão do usuário.
+2. **Modo padrão**: informe que o lote está pronto para `/validar` — **não
+   dispare o Validador automaticamente**, isso é decisão do usuário. **Pare
+   aqui.** Rodar `/executar` de novo (sem argumento, ou nomeando o próximo lote) é
+   decisão do usuário.
+3. **`--continuar [N]`**: não pare — valide este lote agora, seguindo exatamente
+   as Seções 2-5 do Comando 2 (`/validar`) mais abaixo (pule a Seção 1 de lá: o
+   lote-alvo já é conhecido, é o que acabou de fechar). Trate as pausas
+   obrigatórias da validação igual às deste comando:
+   - **Reprovação crítica de QA, achado alto/crítico de DevSecOps, ou
+     inconsistência estrutural que exige redesenho** (Comando 2, Seção 4):
+     **pare o `/executar` aqui também** — não siga para o próximo lote.
+   - **Reprovação simples/débito baixo-médio**: não para — vira tarefa em
+     `Refatoração Lote-X` (Comando 2, Seção 4), e o fluxo segue.
+   - Validação limpa: o lote fecha `Validado` (ou `Validado com ressalvas`) e,
+     se não atingiu o teto `N` (ou não há teto) e ainda há lote pendente, volte à
+     Seção 1 deste comando para o próximo lote, sem pausar.
+   - Se não sobrar nenhum lote pendente no `TASK.md`: informe que a execução (com
+     validação) está completa.
 
-**Argumento opcional `--continuar [N]`**: se o usuário passar esse argumento,
-encadeie lote após lote (até N, ou sem limite se N omitido) sem pausar entre um
-lote fechado e o próximo — as pausas obrigatórias (fix-loop esgotado, desvio de
-escopo, bloqueio) continuam valendo igual em qualquer modo.
+**Argumento opcional `--continuar [N]`**: encadeia lote após lote (até N, ou sem
+limite se N omitido), **incluindo a validação automática de cada lote** assim que
+ele fecha (item 3 acima) — o usuário não precisa rodar `/validar` separado depois
+de cada lote para manter o encadeamento. As pausas obrigatórias de qualquer uma
+das duas etapas (implementação ou validação) valem igual em qualquer modo — só
+param por achado crítico/bloqueio real, nunca por achado simples/débito
+baixo-médio. Rodar `/validar --continuar` separadamente continua útil para
+alcançar lotes que fecharam fora de uma sessão de `/executar --continuar` (ex.:
+implementados manualmente, ou numa chamada anterior sem `--continuar`).
 
 ---
 
-## Comando 2: `/validar` — Validador (QA + DevSecOps) + checagem estrutural do
-Coordenador
+## Comando 2: `/validar` — Validador (QA + DevSecOps + checagem estrutural)
 
 | Dispara quando | Agente(s) | Ação | Pausa obrigatória |
 |---|---|---|---|
-| Usuário roda `/validar` sobre um lote com todas as tarefas `Concluída` (`--continuar [N]` encadeia lotes prontos, sem esperar) | `validador` (chapéu QA → chapéu DevSecOps) → `coordenador` (checagem estrutural) | Valida funcionalmente, audita segurança, confirma consistência do TASK.md; achado simples/débito baixo-médio vira tarefa em `Refatoração Lote-X` sem parar | Reprovação **crítica** do QA; achado de severidade alta/crítica do DevSecOps; inconsistência estrutural do Coordenador |
+| Usuário roda `/validar` sobre um lote com todas as tarefas `Concluída` (`--continuar [N]` encadeia lotes prontos, sem esperar; `/executar --continuar` também aciona isso automaticamente por lote) | `validador` (chapéu QA → chapéu DevSecOps → checagem estrutural, tudo na mesma chamada) | Valida funcionalmente, audita segurança, confirma consistência do TASK.md sozinho; achado simples/débito baixo-médio vira tarefa em `Refatoração Lote-X` sem parar | Reprovação **crítica** do QA; achado de severidade alta/crítica do DevSecOps; inconsistência estrutural que exige redesenho (só aí escala ao `coordenador`) |
 
 ### 1. Determinar o lote-alvo
 
@@ -176,25 +198,39 @@ Coordenador
    `executor`, para correção de código). Informe que a próxima ação é rodar
    `/executar` de novo sobre a tarefa afetada.
 
-### 4. Checagem estrutural (Coordenador)
+### 4. Checagem estrutural (o próprio Validador — sem reabrir o Coordenador)
 
-1. Dispare `coordenador` para confirmar: toda tarefa do lote `Concluída`, nenhuma
-   dependência da Seção 4 órfã/inconsistente, nenhuma tarefa `Bloqueada` sem
-   resolução.
+Esta etapa **não dispara outro agente**: o `validador`, ainda na mesma chamada,
+com o que já tem em mãos (`TASK.md`, `QA-REPORT.md`, `SECURITY-REVIEW.md` que ele
+mesmo acabou de produzir), confirma o fechamento do lote sozinho. Voltar ao
+Coordenador para essa confirmação de rotina só reabre um agente com escopo limpo
+(ver "Reset de contexto" neste documento) para reafirmar o que o Validador já
+sabe — por isso essa etapa deixou de ser um dispatch separado.
+
+1. Confirme: toda tarefa do lote `Concluída`, nenhuma dependência da Seção 4 do
+   `TASK.md` órfã/inconsistente **relativa a este lote**, nenhuma tarefa
+   `Bloqueada` sem resolução.
 2. **Se a Seção 2 ou 3 acima produziu reprovação simples/débito não bloqueante**:
-   na mesma chamada, o `coordenador` cria (ou adiciona tarefa a) o lote
-   `Refatoração Lote-X` na Seção 3 do `TASK.md` (X = identificador do lote-alvo
-   atual), posicionado depois de todos os lotes já existentes na ordem de
-   execução (Seção 4 do `TASK.md`) — uma tarefa por achado, referenciando a
-   entrada do `QA-REPORT.md`/`SECURITY-REVIEW.md` que a originou. O lote-alvo
-   **não** é reaberto por causa disso.
-3. **Consistente** (sem inconsistência estrutural além do que o item 2 já tratou):
-   siga para a Seção 5. Se o item 2 se aplicou, o lote fecha como `Validado (com
-   ressalvas)` — a correção já está agendada em `Refatoração Lote-X`.
-4. **Inconsistência estrutural encontrada** (além dos achados simples já tratados
-   no item 2): **pare**, explique, e informe se é o `TASK.md` que precisa de
-   correção direta ou se é pendência de implementação (nesse caso, volta para
-   `/executar`).
+   crie (ou adicione tarefa a) o lote `Refatoração Lote-X` na Seção 3 do
+   `TASK.md` (X = identificador do lote-alvo atual), posicionado depois de todos
+   os lotes já existentes na ordem de execução (Seção 4 do `TASK.md`) — uma
+   tarefa por achado, referenciando a entrada do `QA-REPORT.md`/
+   `SECURITY-REVIEW.md` que a originou. O lote-alvo **não** é reaberto por causa
+   disso. Uso restrito das skills de decomposição do Coordenador
+   (`task-decomposition`, `dependency-sequencing`, `task-md-drafting` — ver
+   `validador.md`): só para esta tarefa pontual, nunca para redecompor um lote
+   inteiro.
+3. **Consistente** (mecânico — nenhuma constatação exige redesenho): siga para a
+   Seção 5. Se o item 2 se aplicou, o lote fecha como `Validado (com ressalvas)`
+   — a correção já está agendada em `Refatoração Lote-X`.
+4. **Inconsistência que exige redesenho de dependência/decomposição real** (não é
+   mera constatação de rotina — ex.: dependência genuinamente quebrada, lacuna de
+   decomposição que o Validador não tem autoridade para decidir sozinho): **só
+   aqui** volte a depender de outro agente — **pare**, registre em
+   `BLOCKERS.md` escalando para `coordenador` (PIPELINE-CONVENTIONS.md §4), e
+   informe ao usuário se é o `TASK.md` que precisa de correção direta ou se é
+   pendência de implementação (nesse caso, volta para `/executar` depois que o
+   Coordenador resolver).
 
 ### 5. Encerramento
 
@@ -287,8 +323,9 @@ agrupando por `Lote`), `QA-REPORT.md`, `SECURITY-REVIEW.md`, `DEPLOY.md` e
 `BLOCKERS.md`, classifica cada lote (`Concluído`/`Validado`/`Bloqueado`/`Em
 andamento`/`Não iniciado`/`Indeterminado`) e apresenta o relatório. Único ajuste:
 "Concluído" (critério de fechamento antigo: QA + DevSecOps + Tech Lead aprovados)
-passa a ser "Validado" (critério do comando 2 acima: QA + DevSecOps do Validador +
-checagem estrutural do Coordenador), e "publicado" passa a ser rastreado via
+passa a ser "Validado" (critério do comando 2 acima: QA + DevSecOps + checagem
+estrutural, tudo resolvido pelo próprio Validador salvo escalação real ao
+Coordenador), e "publicado" passa a ser rastreado via
 `DEPLOY.md` produzido pelo comando 3. Não dispara nenhum agente, não avança
 tarefa, não sugere próximo comando.
 

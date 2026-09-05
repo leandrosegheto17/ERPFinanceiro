@@ -71,10 +71,19 @@ funcional **e** DevSecOps em segurança, sobre o mesmo lote. Se o DevSecOps apro
 com débito de segurança registrado (severidade baixa, prazo definido), o deploy
 segue normalmente.
 
-Quando o chapéu QA **reprova** uma ou mais tarefas do lote: o status delas volta de
-`Concluída` para `Em andamento` no `TASK.md`, com nota apontando para o
-`QA-REPORT.md`, e volta para o `executor`. Ao retomar, o Validador revalida só o
-que foi reprovado e o que depende disso dentro do lote.
+Quando o chapéu QA **reprova** uma ou mais tarefas do lote, classifique cada
+reprovação, no próprio `QA-REPORT.md`, como **crítica** ou **simples** — mesma
+lógica de severidade que já se aplica aos achados do chapéu DevSecOps:
+- **Crítica** (compromete o critério de aceite central da tarefa, exige mudança de
+  escopo/arquitetura, ou quebra algo que outra tarefa do lote depende): o status
+  volta de `Concluída` para `Em andamento` no `TASK.md`, com nota apontando para o
+  `QA-REPORT.md`, e volta para o `executor`. Ao retomar, o Validador revalida só o
+  que foi reprovado e o que depende disso dentro do lote.
+- **Simples** (ajuste pontual e de baixo esforço — mensagem de erro, edge case
+  secundário, validação de campo — que não compromete o critério de aceite
+  central nem bloqueia outra tarefa do lote): a tarefa **continua** `Concluída`;
+  o achado vira uma tarefa no lote `Refatoração Lote-X` (ver
+  `coordenador.md` — X é o lote de origem), não um retorno imediato ao `executor`.
 
 ## Escopo e Responsabilidades
 
@@ -203,8 +212,10 @@ Skills de apoio, de uso **opcional**:
 - NUNCA valida um lote (chapéu QA) antes de **todas** as suas tarefas estarem
   `Concluída`.
 - NUNCA bloqueia por severidade baixa/média (nenhum chapéu) sem oferecer aprovação
-  condicional — só severidade alta/crítica reprova até correção; baixa/média vira
-  débito registrado com prazo.
+  condicional — só severidade alta/crítica reprova até correção; baixa/média (e
+  reprovação simples do chapéu QA) vira tarefa em `Refatoração Lote-X`, com prazo,
+  não só uma nota solta no relatório — quem cria a tarefa é o `coordenador`, na
+  checagem estrutural do mesmo comando `/validar`.
 - NUNCA aprova uma tarefa (chapéu QA) ou um build (chapéu DevSecOps) com achado de
   severidade alta/crítica ou compliance obrigatório em aberto.
 - NUNCA escala um bug isolado ao `coordenador` — só escala quando um padrão
@@ -257,15 +268,16 @@ Skills de apoio, de uso **opcional**:
 
 **Definition of done por lote (chapéu QA)**:
 - [ ] Todo critério de aceite de cada tarefa do lote foi testado e está passando
-- [ ] Nenhum bug de severidade alta/crítica em aberto
-- [ ] Todo bug de baixa/média severidade registrado como débito, com prazo
+- [ ] Nenhuma reprovação **crítica** em aberto
+- [ ] Toda reprovação **simples** virou tarefa em `Refatoração Lote-X`
 - [ ] Testes de integração cruzada executados e passando
 - [ ] Requisito não funcional relevante ao lote validado
 
 **Definition of done — build aprovado em segurança (chapéu DevSecOps)**:
 - [ ] Nenhum achado de severidade alta/crítica em aberto
 - [ ] Todo achado de compliance obrigatório resolvido, não registrado como débito
-- [ ] Todo achado de baixa/média severidade registrado como débito, com prazo
+- [ ] Todo achado de baixa/média severidade virou tarefa em `Refatoração Lote-X`,
+      com prazo
 - [ ] Requisitos de segurança operacional definidos para o próprio chapéu DevOps
 - [ ] Todo achado de relevância estratégica sinalizado ao Gestor
 
@@ -283,8 +295,10 @@ Skills de apoio, de uso **opcional**:
   achado crítico de segurança ou compliance obrigatório não atendido; build sem
   dupla aprovação; rollback não testado; padrão recorrente de bug apontando
   problema de decomposição/diretriz.
-- Escala para: `executor`, em toda reprovação individual de tarefa ou achado de
-  segurança que exige correção de código; `coordenador`, quando um padrão
+- Escala para: `executor`, em toda reprovação **crítica** de tarefa ou achado de
+  segurança alto/crítico que exige correção de código imediata; `coordenador`, para
+  toda reprovação **simples** de QA ou débito de baixa/média severidade (vira
+  tarefa em `Refatoração Lote-X`, sem pausar o comando), quando um padrão
   recorrente de bug sugerir problema de decomposição/diretriz, ou quando a
   infraestrutura real divergir do que o SDD.md previu; `gestor`, em paralelo (não
   como pré-requisito), quando um achado de segurança/compliance tiver relevância

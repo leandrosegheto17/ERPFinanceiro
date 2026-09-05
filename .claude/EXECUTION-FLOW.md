@@ -132,7 +132,7 @@ Coordenador
 
 | Dispara quando | Agente(s) | Ação | Pausa obrigatória |
 |---|---|---|---|
-| Usuário roda `/validar` sobre um lote com todas as tarefas `Concluída` | `validador` (chapéu QA → chapéu DevSecOps) → `coordenador` (checagem estrutural) | Valida funcionalmente, audita segurança, confirma consistência do TASK.md | Reprovação do QA; achado de severidade alta/crítica do DevSecOps; inconsistência estrutural do Coordenador |
+| Usuário roda `/validar` sobre um lote com todas as tarefas `Concluída` (`--continuar [N]` encadeia lotes prontos, sem esperar) | `validador` (chapéu QA → chapéu DevSecOps) → `coordenador` (checagem estrutural) | Valida funcionalmente, audita segurança, confirma consistência do TASK.md; achado simples/débito baixo-médio vira tarefa em `Refatoração Lote-X` sem parar | Reprovação **crítica** do QA; achado de severidade alta/crítica do DevSecOps; inconsistência estrutural do Coordenador |
 
 ### 1. Determinar o lote-alvo
 
@@ -149,11 +149,18 @@ Coordenador
    `non-functional-validation`, `qa-report-drafting`) sobre o lote-alvo inteiro →
    atualiza `QA-REPORT.md`.
 2. **Aprovado ou Aprovado com ressalvas**: siga para a Seção 3.
-3. **Reprovação de alguma tarefa**: **pare**. Volte a(s) tarefa(s) reprovada(s) — e
-   o que depende delas dentro do lote — para `Em andamento` no `TASK.md`, explique
-   ao usuário o motivo (do `QA-REPORT.md`), e informe que a próxima ação é rodar
-   `/executar` de novo sobre esse lote para corrigir. Não dispare o Executor
-   automaticamente.
+3. **Reprovação de alguma tarefa**: o `validador` classifica cada reprovação no
+   próprio `QA-REPORT.md` (ver `validador.md`):
+   - **Crítica** (compromete o critério de aceite central da tarefa, exige mudança
+     de escopo/arquitetura, ou quebra algo de que outra tarefa do lote depende):
+     **pare aqui**. Volte a(s) tarefa(s) para `Em andamento` no `TASK.md`, explique
+     o motivo ao usuário (do `QA-REPORT.md`) e informe que a próxima ação é rodar
+     `/executar` de novo sobre esse lote. Não dispare o Executor automaticamente.
+   - **Simples** (ajuste pontual e de baixo esforço — mensagem de erro, edge case
+     secundário, validação de campo — que não compromete o critério de aceite
+     central nem bloqueia outra tarefa do lote): **não pare**. A tarefa continua
+     `Concluída`; siga para a Seção 3 normalmente — a correção é agendada na
+     Seção 4, como tarefa em `Refatoração Lote-X`, não como retorno ao Executor.
 
 ### 3. Auditoria de segurança (chapéu DevSecOps)
 
@@ -162,7 +169,8 @@ Coordenador
    `sensitive-data-exposure-check`, `finding-severity-classification`,
    `security-report-drafting`) sobre o lote-alvo → atualiza `SECURITY-REVIEW.md`.
 2. **Sem achado bloqueante** (ou só débito de baixa/média severidade registrado):
-   siga para a Seção 4.
+   siga para a Seção 4 — o débito vira tarefa em `Refatoração Lote-X` lá, não fica
+   só como nota solta no relatório.
 3. **Achado de severidade alta/crítica, ou compliance obrigatório não atendido**:
    **pare**. Explique ao usuário o achado e o campo "Escala para" (normalmente
    `executor`, para correção de código). Informe que a próxima ação é rodar
@@ -173,16 +181,45 @@ Coordenador
 1. Dispare `coordenador` para confirmar: toda tarefa do lote `Concluída`, nenhuma
    dependência da Seção 4 órfã/inconsistente, nenhuma tarefa `Bloqueada` sem
    resolução.
-2. **Consistente**: o lote está `Validado` — pronto para `/deploy`.
-3. **Inconsistência encontrada**: **pare**, explique, e informe se é o `TASK.md`
-   que precisa de correção direta ou se é pendência de implementação (nesse caso,
-   volta para `/executar`).
+2. **Se a Seção 2 ou 3 acima produziu reprovação simples/débito não bloqueante**:
+   na mesma chamada, o `coordenador` cria (ou adiciona tarefa a) o lote
+   `Refatoração Lote-X` na Seção 3 do `TASK.md` (X = identificador do lote-alvo
+   atual), posicionado depois de todos os lotes já existentes na ordem de
+   execução (Seção 4 do `TASK.md`) — uma tarefa por achado, referenciando a
+   entrada do `QA-REPORT.md`/`SECURITY-REVIEW.md` que a originou. O lote-alvo
+   **não** é reaberto por causa disso.
+3. **Consistente** (sem inconsistência estrutural além do que o item 2 já tratou):
+   siga para a Seção 5. Se o item 2 se aplicou, o lote fecha como `Validado (com
+   ressalvas)` — a correção já está agendada em `Refatoração Lote-X`.
+4. **Inconsistência estrutural encontrada** (além dos achados simples já tratados
+   no item 2): **pare**, explique, e informe se é o `TASK.md` que precisa de
+   correção direta ou se é pendência de implementação (nesse caso, volta para
+   `/executar`).
 
 ### 5. Encerramento
 
 Apresente o resumo do lote validado (veredito QA, veredito DevSecOps, checagem
-estrutural) e informe que está pronto para `/deploy`. **Não dispare o deploy
-automaticamente.**
+estrutural, e as tarefas criadas em `Refatoração Lote-X`, se houver) e informe que
+está pronto para `/deploy`. **Não dispare o deploy automaticamente.**
+
+- Modo padrão: **pare aqui**, mesmo com o lote fechado limpo.
+- `--continuar [N]`: se não atingiu o teto N (ou não há teto) e a Seção 1 encontra
+  outro lote pronto agora, volte à Seção 1 para ele, sem pausar. Se não sobrar
+  nenhum lote pronto no momento: **isso não é erro** — informe e encerre a
+  resposta normalmente, é o estado esperado entre uma liberação de lote e outra.
+
+**Argumento opcional `--continuar [N]`**: encadeia a validação lote após lote (até
+N, ou sem limite se N omitido) — ao terminar um lote (Seção 5), volta à Seção 1
+para o próximo lote já pronto, sem pausar entre eles. Os pontos de parada
+obrigatórios (reprovação **crítica** de QA, achado alto/crítico de DevSecOps,
+inconsistência estrutural, bloqueio) valem igual em qualquer modo — só reprovação
+**simples**/débito baixo-médio não para, e vira tarefa em `Refatoração Lote-X`
+(Seção 4, item 2). Este comando nunca espera lote ficar pronto sozinho: se nenhum
+lote atende ao critério da Seção 1, ele encerra normalmente na hora, mesmo em
+`--continuar`. Para checar "tem lote novo pronto?" de tempos em tempos sem o
+usuário rodar o comando de novo manualmente, combine com o skill `/loop` — ex.:
+`/loop 5m /validar --continuar` — que reagenda a próxima chamada sozinho; uma
+validação em andamento nunca é interrompida no meio por causa do intervalo.
 
 ---
 

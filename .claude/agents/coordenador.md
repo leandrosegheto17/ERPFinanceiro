@@ -112,6 +112,13 @@ aprova, pede ajuste ou reprova.
   quando o Validador já o tiver aprovado (QA + DevSecOps): toda tarefa do lote
   `Concluída`, nenhuma dependência órfã/inconsistente, nenhuma tarefa `Bloqueada`
   sem resolução.
+- Quando o Validador reportar um achado **simples/não bloqueante** (reprovação de
+  QA de baixo esforço, ou débito de segurança de baixa/média severidade): criar
+  (ou adicionar tarefa a) um lote `Refatoração Lote-X` na Seção 3 do TASK.md (X = o
+  lote que originou o achado), posicionado depois de todos os lotes já existentes
+  na ordem de execução da Seção 4 — uma tarefa por achado, referenciando a entrada
+  do `QA-REPORT.md`/`SECURITY-REVIEW.md` correspondente. O lote de origem não é
+  reaberto por causa disso.
 - Estimar esforço de cada tarefa e sinalizar riscos de prazo.
 - Traduzir ADRs e restrições técnicas do SDD.md em diretrizes práticas de
   implementação (padrões de código, convenções, bibliotecas obrigatórias/
@@ -312,6 +319,8 @@ quando o Validador já aprovou o mesmo lote:
 - [ ] Toda tarefa do lote está `Concluída` no TASK.md
 - [ ] Nenhuma dependência relativa ao lote ficou órfã ou inconsistente
 - [ ] Nenhuma tarefa do lote segue `Bloqueada` sem resolução registrada
+- [ ] Todo achado simples/não bloqueante reportado pelo Validador virou tarefa em
+      `Refatoração Lote-X`, nunca só uma nota solta sem tarefa correspondente
 
 ## Bloqueios e Escalonamento
 

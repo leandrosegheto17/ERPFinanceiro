@@ -1,228 +1,280 @@
 # EXECUTION-FLOW.md
 
 Sequência lógica da **fase de execução** — parte de onde o planejamento termina
-(`TASK.md` aprovado no Gate 3 + `GUARDRAILS.md` aprovado, ver `PLANNING-FLOW.md`) e
-vai até o deploy em produção, fechando o ciclo de volta ao CTO.
+(`SDD.md`/`UX-SPEC.md`/`TASK.md` aprovados pelo usuário + `GUARDRAILS.md` aprovado
+pelo Gestor, ver `PLANNING-FLOW.md`) e vai até o deploy em produção, fechando o
+ciclo de volta ao Gestor.
 
-Este documento não redefine nenhum dos 12 agentes nem os critérios internos de cada
-um além do necessário para operar em lote (ver seção seguinte) — só ordena o que cada
-agente já declara, com pontos de paralelismo, pausa e escalonamento.
+Este documento cobre a lógica dos **três comandos** da fase de execução —
+`/executar` (Executor implementa), `/validar` (Validador audita um lote fechado) e
+`/deploy` (Validador publica) — e do comando somente-leitura `/listar`. Nenhum dos
+três dispara o próximo automaticamente: **o usuário é o orquestrador**, decide
+quando rodar cada um. Este documento não redefine os agentes consolidados
+(`.claude/agents/gestor.md`, `coordenador.md`, `executor.md`, `validador.md`) nem a
+convenção de artefatos (`PIPELINE-CONVENTIONS.md`) — só ordena o que cada um já
+declara, em nível de comando.
 
-**Técnica de implementação**: cada trilha usa ciclo TDD (teste falha → implementação
-mínima → teste passa → refatora) dentro da própria skill `automated-testing` do
-agente — é técnica interna de cada dispatch, não um passo separado do orquestrador.
-Uma camada de revisão (spec-compliance + qualidade de código) roda depois de cada
-tarefa implementada, antes do QA entrar — mecanismo próprio deste fluxo, não do
-Superpowers (ver histórico de decisão: Superpowers foi avaliado e descartado como
-motor deste fluxo por ser dimensionado para feature isolada em manutenção, não para
-um pipeline de 12 papéis com gate de CTO — revisitar quando a fase de manutenção
-pós-v1 for desenhada).
+> Modelo anterior (12 agentes, um único `/executar` que fazia implementação + QA +
+> DevSecOps + DevOps encadeados por lote) descontinuado — ver nota no topo de
+> `PIPELINE-CONVENTIONS.md`. Os agentes `backend`, `frontend`, `mobile`, `qa`,
+> `devsecops`, `devops`, `tech-lead` continuam existindo como arquivos, mas não são
+> mais acionados por este fluxo.
 
-**Pré-requisito bloqueante**: este projeto precisa ser um repositório git antes deste
-fluxo rodar de verdade — a camada de revisão depende de diff (`git diff`) entre o
-estado antes e depois de cada tarefa.
+**Pré-requisito bloqueante**: este projeto precisa ser um repositório git antes de
+`/executar` rodar de verdade — a revisão inline pós-tarefa (ver comando 1) depende
+de `git diff`.
 
 ---
 
 ## Unidade de trabalho: o lote
 
-Até a revisão que originou esta seção, a unidade de trabalho era a tarefa individual
-— o que gerava dispatch demais (bateria completa de QA a cada tarefa) e nenhum ponto
-de poda de contexto ao longo do projeto. O extremo oposto (Backend/Frontend/Mobile
-executando o `TASK.md` inteiro antes de qualquer QA) foi descartado por criar efeito
-cascata de retrabalho quando um erro nasce cedo e só é detectado no fim. A unidade
-adotada é o **lote**: um conjunto de tarefas do `TASK.md` que formam uma
-funcionalidade/módulo com sentido próprio (ex.: "cadastro de paciente").
+A unidade de trabalho continua sendo o **lote** — um conjunto de tarefas do
+`TASK.md` que formam uma funcionalidade/módulo com sentido próprio (ex.: "cadastro
+de paciente"), atribuído pelo Coordenador durante a decomposição
+(`/definir_organizar`).
 
-- **Onde vive**: coluna `Lote` na Seção 3 do `TASK.md` (`task-decomposition`,
-  `tech-lead.md`), atribuída pelo Tech Lead durante a decomposição, alinhada aos
-  clusters de dependência que ele já mapeia na Seção 4 — um lote é, sempre que
-  possível, um componente conectado no grafo de dependências, não um corte
-  arbitrário.
-- **Tamanho**: o reset de contexto abaixo só entrega o ganho pretendido se o lote
-  for pequeno o bastante para não acumular contexto excessivo antes de fechar — o
-  Tech Lead segue um teto prático de ~5-6 tarefas por lote, quebrando funcionalidade
-  grande em sublotes sequenciais quando preciso (critério completo em
-  `tech-lead.md`).
-- **O que opera em nível de lote**: as 3 trilhas de implementação (dentro do lote,
-  tarefas em sequência), a revisão spec-compliance + qualidade pós-tarefa, a bateria
-  completa de QA, a auditoria completa do DevSecOps, o fechamento estrutural do Tech
-  Lead e o deploy em staging/produção.
-- **O que continua em nível de projeto** (não de lote): `test-strategy-planning` do
-  QA, `static-security-analysis` contínuo do DevSecOps, e a preparação de
-  infraestrutura/CI-CD do DevOps — os três já rodam desde o início da execução,
-  independente de qualquer lote fechar.
-- **Teto de fix-loop**: a revisão pós-tarefa (spec-compliance + qualidade) tem no
-  máximo **2 tentativas de correção**. Na 3ª falha consecutiva na mesma tarefa: para
-  o ciclo, marca a tarefa `Bloqueada`, registra `BLOCKERS.md` e escala para
-  `tech-lead` — falha repetida de revisão é sinal de tarefa mal decomposta/ambígua,
-  mesma lógica já usada quando o QA identifica um padrão recorrente de bug.
+- **Onde vive**: coluna `Lote` na Seção 3 do `TASK.md`.
+- **Tamanho do lote**: ~5-6 tarefas, mesmo critério de antes — mas agora cada
+  **tarefa** é bem menor (granularidade fina, ver `coordenador.md`), porque o
+  paralelismo real acontece dentro do lote, tarefa a tarefa, não mais só entre 3
+  trilhas fixas por papel.
+- **Paralelismo dentro do lote**: a Seção 4 do `TASK.md` marca explicitamente quais
+  tarefas de um lote são independentes entre si (podem rodar em paralelo) e quais
+  têm dependência direta. O `/executar` usa esse mapeamento para decidir quantas
+  instâncias do Executor disparar em paralelo a cada rodada — não há mais um teto
+  fixo de "3 trilhas" (Backend/Frontend/Mobile); o teto real é "toda tarefa
+  elegível da rodada", respeitando o tamanho do lote (~5-6) como limite prático de
+  paralelismo simultâneo.
+- **O que opera em nível de lote**: `/executar` (implementação), `/validar`
+  (auditoria QA + DevSecOps + checagem estrutural do Coordenador).
+- **O que opera em nível de projeto** (não de lote): `/deploy` pode processar um
+  lote específico ou o conjunto de lotes já validados e ainda não publicados — ver
+  comando 3.
 
 ---
 
-## As 3 trilhas paralelas (Backend / Frontend / Mobile), dentro de um lote
+## Comando 1: `/executar` — Executor (Backend/Frontend/Mobile), em paralelo por
+tarefa
 
-Cada trilha processa, em paralelo com as outras duas, as tarefas **do lote corrente**
-atribuídas a ela (coluna "dono/time responsável", Seção 3). **Dentro de uma mesma
-trilha, as tarefas rodam em sequência** (uma por vez, respeitando as dependências já
-mapeadas na Seção 4 do TASK.md) — só o paralelismo *entre* trilhas é real.
+| Dispara quando | Agente | Ação | Pausa obrigatória |
+|---|---|---|---|
+| Usuário roda `/executar` sobre um `TASK.md` com tarefas pendentes | `executor` (múltiplas instâncias em paralelo, por tarefa elegível) | Implementa, testa (TDD), atualiza Status no TASK.md | Reprovação da revisão inline após 2 tentativas; desvio grande de escopo sinalizado pelo Executor; fim do lote-alvo |
 
-Por tarefa, dentro da trilha:
+### 1. Determinar o lote-alvo
 
-1. Dispara o agente da trilha (`backend`/`frontend`/`mobile`) para a tarefa
-   específica — ele implementa em ciclo TDD via sua própria `automated-testing`.
-2. Ao concluir, dispara uma revisão de spec-compliance (contra o critério de aceite
-   da própria tarefa) + qualidade de código.
-3. Achado da revisão: corrige e revisa de novo (fix-loop) — **sem pausar**, até o
-   teto de 2 tentativas definido acima; na 3ª falha, pausa e escala (ver seção
-   anterior).
-4. Marca a tarefa `Concluída` no `TASK.md` (mecanismo já definido nos três agentes).
+1. Leia a Seção 3 do `TASK.md`, agrupe por `Lote`. Classifique cada um: `Fechado`
+   (já validado por `/validar` e sem tarefa pendente), `Em andamento` (alguma
+   tarefa `Concluída`/`Em andamento`, mas não todas), `Não iniciado`.
+2. Lote-alvo: o nomeado em `$ARGUMENTS`, ou o primeiro `Em andamento`, ou — se
+   nenhum — o primeiro `Não iniciado` cujas dependências externas (Seção 4) já
+   estejam satisfeitas.
+3. Monte a fila de tarefas elegíveis do lote-alvo: `Pendente`/`Em andamento` com
+   dependências internas ao lote já resolvidas (conforme marcação da Seção 4).
+4. Leia `.md/BLOCKERS.md` — se houver entrada `Aberto` afetando este lote, **pare
+   aqui** e apresente ao usuário (ver Seção 4 deste documento) antes de disparar
+   qualquer agente.
 
-**Dependência de contrato de API (Frontend/Mobile ↔ Backend)**: não é orquestrada
-aqui — `frontend.md`/`mobile.md` já resolvem sozinhos ("mock se o endpoint já está
-em `API-CONTRACT.yaml`, aguarda se não está"). O orquestrador só precisa saber que
-uma tarefa `Em andamento` com nota de mock ainda não está de fato pronta — e,
-portanto, o lote ainda não fechou.
+### 2. Rodada paralela
 
----
+Repita até a fila esvaziar ou um bloqueio parar o fluxo:
 
-## QA — uma vez por lote fechado
+1. **Anuncie** todas as tarefas elegíveis desta rodada (uma instância do Executor
+   por tarefa, independente de qual chapéu — Backend/Frontend/Mobile — cada uma
+   exige).
+2. **Dispare em paralelo, num único bloco de chamadas** (`Agent`, `subagent_type:
+   executor`, `run_in_background: false` — a revisão seguinte depende do
+   resultado), uma por tarefa. O prompt de cada dispatch: a tarefa específica do
+   `TASK.md` (não o arquivo inteiro) e seu critério de aceite.
+3. **Para cada tarefa que voltar**, rode a revisão inline (você, o executor do
+   comando — não um agente separado) contra o `git diff` daquela tarefa
+   especificamente: spec-compliance (bate com o critério de aceite e as
+   diretrizes de implementação) + qualidade de código (skill `code-review`).
+   - **Achado**: devolva para a mesma instância do Executor corrigir, e revise de
+     novo — fix-loop, **máximo 2 tentativas**, sem pausar entre elas.
+   - **3ª falha consecutiva na mesma tarefa**: **pare** — marque a tarefa
+     `Bloqueada`, registre `BLOCKERS.md`, e **encerre o comando aqui**, explicando
+     ao usuário o que falhou nas 2 tentativas e perguntando como seguir. Não
+     insista numa 4ª tentativa por conta própria.
+4. **Marque a tarefa `Concluída`** no `TASK.md` quando a revisão passar.
+5. Se o Executor sinalizar um desvio grande de escopo/estimativa, ou uma
+   lacuna/inconsistência no `UX-SPEC.md`/`SDD.md`: **pare o comando aqui** (ver
+   Seção 4) — não decida por conta própria, não redisparur o Coordenador
+   sozinho.
+6. Recalcule a fila (uma tarefa `Concluída` pode ter liberado outra do mesmo
+   lote) e volte ao passo 1.
 
-`test-strategy-planning` continua rodando desde o Gate 3 (fim do planejamento), em
-paralelo, nível de projeto — não é acionado de novo aqui e não muda com esta revisão.
+**Dependência de contrato de API**: não orquestre isso manualmente — `executor.md`
+já resolve sozinho (mock se o endpoint já está em `API-CONTRACT.yaml`, aguarda se
+não está). Uma tarefa `Em andamento` com nota de mock não conta como `Concluída`.
 
-As 5 skills de validação (`acceptance-criteria-validation`,
-`cross-platform-integration-testing`, `bug-documentation`,
-`non-functional-validation`, `qa-report-drafting`) disparam **uma vez, quando todas
-as tarefas do lote corrente estiverem `Concluída`** por Backend/Frontend/Mobile —
-não mais por tarefa individual, nem em lote com o projeto inteiro. Isso muda o
-"Ponto de Sincronização" e os "Critérios de Pronto" declarados em `qa.md`
-(atualizados junto com esta revisão) de granularidade "por tarefa" para "por lote".
+### 3. Fim do lote-alvo
 
-- Aprovação (Aprovado ou Aprovado com ressalvas) do lote inteiro: segue sem pausa.
-- **Reprovação de qualquer tarefa do lote: pausa obrigatória.** Explica o motivo, a(s)
-  tarefa(s) reprovada(s) — e o que depende delas dentro do mesmo lote — volta(m) pra
-  trilha responsável (`Em andamento`, conforme já definido em `qa.md`). O QA
-  **revalida só o que foi reprovado e suas dependências**, não o lote inteiro do
-  zero, quando retomar.
+Quando a fila esvaziar (todas as tarefas `Concluída` ou `Bloqueada` com bloqueio já
+reportado):
 
----
+1. Apresente um resumo: tarefas concluídas, tarefas bloqueadas (se houver), e o
+   estado do lote.
+2. Informe que o lote está pronto para `/validar` — **não dispare o Validador
+   automaticamente**, isso é decisão do usuário.
+3. **Pare aqui.** Se `$ARGUMENTS` não pediu processamento de outro lote em
+   sequência, termine a resposta. Rodar `/executar` de novo (sem argumento, ou
+   nomeando o próximo lote) é decisão do usuário.
 
-## DevSecOps — dois ritmos, auditoria por lote
-
-- `static-security-analysis` (SAST, dependências) roda **contínuo desde o início**
-  da execução, nível de projeto, em paralelo às 3 trilhas — não espera nenhum lote
-  fechar. Mantido assim deliberadamente: é varredura automática de baixo custo de
-  dispatch (não é a bateria de 5 skills isoladas que gerava o problema original), e
-  detectar segredo vazado ou dependência vulnerável cedo vale mais do que esperar o
-  lote fechar.
-- **Achado de severidade alta/crítica, a qualquer momento** (inclusive durante a
-  varredura contínua): **pausa obrigatória**, como já era.
-- A auditoria completa (as outras 5 skills) dispara quando o QA tiver aprovado
-  (Aprovado ou Aprovado com ressalvas) **todas as tarefas do lote** — mesmo gatilho
-  "QA aprovou o build" que `devsecops.md` já define; não precisou mudar nada nesse
-  agente, ele já operava em nível de build/lote.
-- Achado que bloqueia: pausa, explica, escala para a trilha de implementação
-  responsável (campo "Escala para" já definido em `devsecops.md`), retoma a trilha
-  original após a correção — e a auditoria do lote é refeita sobre o que mudou.
-
----
-
-## Tech Lead — fecha o lote
-
-Quando QA e DevSecOps já aprovaram (Aprovado ou Aprovado com ressalvas/débito) o
-mesmo lote: o Tech Lead faz uma checagem **estrutural**, não uma reavaliação de
-qualidade ou segurança (isso já foi feito) — confirma que:
-
-- toda tarefa do lote está `Concluída` no `TASK.md`;
-- nenhuma dependência da Seção 4 relativa ao lote ficou órfã ou inconsistente;
-- nenhuma tarefa do lote segue `Bloqueada` sem resolução registrada.
-
-Essa confirmação é o que libera o lote para deploy (seção seguinte) — coerente com o
-papel do Tech Lead como dono do `TASK.md`, sem duplicar a autoridade de QA/DevSecOps.
-Se algo não bate, o Tech Lead corrige o `TASK.md` (ou devolve para a trilha
-responsável, se for pendência de implementação) antes de liberar.
+**Argumento opcional `--continuar [N]`**: se o usuário passar esse argumento,
+encadeie lote após lote (até N, ou sem limite se N omitido) sem pausar entre um
+lote fechado e o próximo — as pausas obrigatórias (fix-loop esgotado, desvio de
+escopo, bloqueio) continuam valendo igual em qualquer modo.
 
 ---
 
-## DevOps — prepara desde o início do projeto, deploy por lote
+## Comando 2: `/validar` — Validador (QA + DevSecOps) + checagem estrutural do
+Coordenador
 
-- `infrastructure-as-code-provisioning` e `cicd-pipeline-configuration` disparam
-  assim que o `SDD.md` está aprovado (Gate 2, já aconteceu no planejamento) — nível
-  de projeto, não de lote — em paralelo com as 3 trilhas, sem pausa.
-- O deploy de um lote em si só dispara com a **dupla aprovação** (`QA-REPORT.md` e
-  `SECURITY-REVIEW.md` do mesmo lote, Aprovado ou Aprovado com ressalvas/débito) **e**
-  a checagem estrutural do Tech Lead (seção anterior).
-- **Deploy em staging: sem pausa**, assim que o lote fecha — cada lote fechado já é
-  um incremento deployável.
-- **Deploy em produção: pausa obrigatória sempre**, por lote — mesmo com tudo limpo.
-  O usuário decide, lote a lote, se aquele incremento vai para produção agora ou
-  espera acumular com o próximo; não é condicional a haver problema, e não espera o
-  `TASK.md` inteiro fechar.
+| Dispara quando | Agente(s) | Ação | Pausa obrigatória |
+|---|---|---|---|
+| Usuário roda `/validar` sobre um lote com todas as tarefas `Concluída` | `validador` (chapéu QA → chapéu DevSecOps) → `coordenador` (checagem estrutural) | Valida funcionalmente, audita segurança, confirma consistência do TASK.md | Reprovação do QA; achado de severidade alta/crítica do DevSecOps; inconsistência estrutural do Coordenador |
 
----
+### 1. Determinar o lote-alvo
 
-## Reset de contexto entre lotes
+1. Lote-alvo: o nomeado em `$ARGUMENTS`, ou o primeiro lote com **todas** as
+   tarefas `Concluída` e ainda sem veredito de `QA-REPORT.md`/`SECURITY-REVIEW.md`
+   para o estado atual das tarefas.
+2. Se nenhum lote atende ao critério (nenhum fechado o suficiente para validar),
+   informe isso ao usuário e pare — não há o que validar ainda.
 
-Ao fechar um lote (QA aprovado + DevSecOps aprovado + Tech Lead aprovado
-estruturalmente), o orquestrador monta um **resumo compacto** a partir do que já
-existe nos artefatos — não cria um arquivo novo:
+### 2. Validação funcional (chapéu QA)
 
-- notas de status das tarefas do lote no `TASK.md`;
-- veredito e débitos registrados do lote no `QA-REPORT.md`;
-- veredito e débitos registrados do lote no `SECURITY-REVIEW.md`;
-- resultado do deploy do lote (staging/produção) no `DEPLOY.md`, quando aplicável.
+1. Dispare `validador` (chapéu QA: `acceptance-criteria-validation`,
+   `cross-platform-integration-testing`, `bug-documentation`,
+   `non-functional-validation`, `qa-report-drafting`) sobre o lote-alvo inteiro →
+   atualiza `QA-REPORT.md`.
+2. **Aprovado ou Aprovado com ressalvas**: siga para a Seção 3.
+3. **Reprovação de alguma tarefa**: **pare**. Volte a(s) tarefa(s) reprovada(s) — e
+   o que depende delas dentro do lote — para `Em andamento` no `TASK.md`, explique
+   ao usuário o motivo (do `QA-REPORT.md`), e informe que a próxima ação é rodar
+   `/executar` de novo sobre esse lote para corrigir. Não dispare o Executor
+   automaticamente.
 
-Esse resumo é apresentado ao usuário no fechamento do lote e é o **único contexto
-carregado** para o próximo — os dispatches do próximo lote se baseiam nos artefatos
-em disco + esse resumo, não no histórico detalhado de dispatches, revisões e
-fix-loops do lote anterior (esse histórico já cumpriu seu papel e não precisa ser
-re-carregado).
+### 3. Auditoria de segurança (chapéu DevSecOps)
 
----
+1. Dispare `validador` (chapéu DevSecOps: `static-security-analysis`,
+   `security-requirement-validation`, `compliance-validation`,
+   `sensitive-data-exposure-check`, `finding-severity-classification`,
+   `security-report-drafting`) sobre o lote-alvo → atualiza `SECURITY-REVIEW.md`.
+2. **Sem achado bloqueante** (ou só débito de baixa/média severidade registrado):
+   siga para a Seção 4.
+3. **Achado de severidade alta/crítica, ou compliance obrigatório não atendido**:
+   **pare**. Explique ao usuário o achado e o campo "Escala para" (normalmente
+   `executor`, para correção de código). Informe que a próxima ação é rodar
+   `/executar` de novo sobre a tarefa afetada.
 
-## Bloqueio silencioso
+### 4. Checagem estrutural (Coordenador)
 
-Se uma tarefa (ou o lote inteiro) ficar travado por dependência não resolvida (de
-outra tarefa, de um endpoint que não existe, de um achado ainda não corrigido), o
-reporte inclui **há quanto tempo está parado** — calculado a partir da data já
-registrada na entrada correspondente de `BLOCKERS.md`, nunca deixado travado em
-silêncio.
+1. Dispare `coordenador` para confirmar: toda tarefa do lote `Concluída`, nenhuma
+   dependência da Seção 4 órfã/inconsistente, nenhuma tarefa `Bloqueada` sem
+   resolução.
+2. **Consistente**: o lote está `Validado` — pronto para `/deploy`.
+3. **Inconsistência encontrada**: **pare**, explique, e informe se é o `TASK.md`
+   que precisa de correção direta ou se é pendência de implementação (nesse caso,
+   volta para `/executar`).
 
----
+### 5. Encerramento
 
-## Resumo: quando pausa e quando não pausa
-
-**Pausa obrigatória**:
-- Qualquer reprovação do QA numa tarefa do lote.
-- Qualquer achado de severidade alta/crítica do DevSecOps, a qualquer momento.
-- 3ª falha consecutiva do fix-loop numa mesma tarefa (teto de 2 tentativas).
-- Sempre antes do deploy em produção, por lote.
-- Tarefa ou lote bloqueado por dependência não resolvida (reporta com tempo parado).
-
-**Progride sem pausa**:
-- Execução paralela normal das 3 trilhas, dentro do lote.
-- Preparação de infraestrutura e pipeline do DevOps (nível de projeto).
-- SAST contínuo do DevSecOps (nível de projeto).
-- Aprovações limpas do QA e do DevSecOps sobre o lote fechado.
-- Checagem estrutural limpa do Tech Lead.
-- Fix-loop interno de revisão pós-implementação, até o teto de 2 tentativas.
-- Deploy em staging, por lote.
+Apresente o resumo do lote validado (veredito QA, veredito DevSecOps, checagem
+estrutural) e informe que está pronto para `/deploy`. **Não dispare o deploy
+automaticamente.**
 
 ---
 
-## Onde o fluxo termina
+## Comando 3: `/deploy` — Validador (QA + DevSecOps de confirmação → DevOps)
 
-Cada deploy em produção gera uma entrada em `DEPLOY.md` (sucesso, rollback,
-incidente) e um registro de fechamento do **Gate 4** em `CTO-REVIEW.md` pelo CTO —
-um registro por lote deployado em produção, sem poder de veto (o deploy já
-aconteceu), coerente com o formato "relatório de cada deploy" que `devops.md` já
-declarava.
+| Dispara quando | Agente | Ação | Pausa obrigatória |
+|---|---|---|---|
+| Usuário roda `/deploy` | `validador` (confirmação final + chapéu DevOps) | Provisiona infra/CI-CD (1ª vez), confirma validação, publica | Sempre antes de produção; achado bloqueante na confirmação final |
 
-A sessão de execução (`/executar`) termina quando não houver mais lote com tarefa
-pendente no escopo corrente do `TASK.md`. Se ainda houver lotes não iniciados,
-informa que ficaram para uma próxima chamada — não força todos os lotes numa única
-execução.
+### 1. Preparação de infraestrutura (só na primeira chamada do projeto)
 
-Ao final, apresentar a lista consolidada de tudo que foi implementado, testado,
-auditado e deployado nesta execução, com status de cada lote.
+Se `.md/DEPLOY.md` ainda não existir (nenhum deploy anterior): dispare `validador`
+(chapéu DevOps: `infrastructure-as-code-provisioning`,
+`cicd-pipeline-configuration`) a partir do `SDD.md`/`GUARDRAILS.md` já aprovados.
+Isso não depende de nenhum lote específico — é preparação de projeto.
+
+### 2. Determinar o que vai ser publicado
+
+1. Lote-alvo: o nomeado em `$ARGUMENTS`, ou — se vazio — **todos** os lotes com
+   status `Validado` (Seção 4 do comando 2) que ainda não aparecem como
+   publicados em `.md/DEPLOY.md`.
+2. Se não houver nenhum lote `Validado` pendente de publicação, informe isso ao
+   usuário e pare — rode `/validar` primeiro.
+
+### 3. Validação final (chapéu QA + DevSecOps, de confirmação)
+
+Para cada lote a publicar: dispare `validador` (chapéus QA + DevSecOps) de novo,
+desta vez focado em **confirmar que nada mudou** desde o veredito registrado em
+`QA-REPORT.md`/`SECURITY-REVIEW.md` e em checar integração **entre lotes** que vão
+ser publicados juntos (regressão cruzada que uma validação por lote isolado não
+cobre). Se o lote já foi validado recentemente e nada mudou, esta etapa pode ser
+mais leve (confirmação), mas nunca é pulada.
+
+- **Achado bloqueante nesta confirmação**: **pare**, explique, informe que a
+  correção volta para `/executar` (e o lote precisará passar por `/validar` de
+  novo antes de tentar `/deploy` outra vez).
+
+### 4. Deploy em staging
+
+Com a validação final limpa: dispare `validador` (chapéu DevOps:
+`deployment-execution`, `observability-setup`,
+`non-functional-requirement-validation`) para staging, para o conjunto de lotes
+desta chamada — **sem pausa**.
+
+### 5. Deploy em produção
+
+**Pare sempre aqui**, mesmo com tudo limpo, e peça confirmação explícita do
+usuário antes de disparar `validador` (chapéu DevOps) para produção. Isso vale
+para o conjunto publicado nesta chamada de `/deploy` — não é condicional a haver
+problema.
+
+### 6. Fechamento (Gate 4 do Gestor)
+
+Após deploy em produção confirmado: dispare `gestor` (registro de fechamento,
+Gate 4, sem poder de veto) para registrar em `.md/CTO-REVIEW.md` o resultado —
+sucesso, versão, lotes incluídos. Apresente o `deploy-report-drafting`
+(`.md/DEPLOY.md`) atualizado e a confirmação do Gate 4.
+
+---
+
+## Comando 4: `/listar` — somente leitura
+
+Sem mudança de mecânica em relação à versão anterior: lê `TASK.md` (Seção 3,
+agrupando por `Lote`), `QA-REPORT.md`, `SECURITY-REVIEW.md`, `DEPLOY.md` e
+`BLOCKERS.md`, classifica cada lote (`Concluído`/`Validado`/`Bloqueado`/`Em
+andamento`/`Não iniciado`/`Indeterminado`) e apresenta o relatório. Único ajuste:
+"Concluído" (critério de fechamento antigo: QA + DevSecOps + Tech Lead aprovados)
+passa a ser "Validado" (critério do comando 2 acima: QA + DevSecOps do Validador +
+checagem estrutural do Coordenador), e "publicado" passa a ser rastreado via
+`DEPLOY.md` produzido pelo comando 3. Não dispara nenhum agente, não avança
+tarefa, não sugere próximo comando.
+
+---
+
+## Bloqueio e escalonamento (comum aos três comandos)
+
+Sempre que um agente sinalizar bloqueio (relatório próprio ou nova entrada
+`Aberto` em `.md/BLOCKERS.md`):
+
+1. **Pare** e explique ao usuário: quem reportou, o que está bloqueado, e para
+   qual agente foi escalado (campo "Escala para" do agente que reportou).
+2. **Não dispare o agente de destino automaticamente** — o usuário decide o
+   próximo passo (rodar `/executar`/`/definir_organizar`/`/planejar` de novo sobre
+   o ponto afetado, pedir um parecer ad hoc ao Gestor, ou ajustar manualmente).
+3. Quando o usuário indicar que quer resolver, rode o comando correspondente —
+   nunca decida a resolução por conta própria.
+
+## Reset de contexto entre lotes/comandos
+
+Ao final de cada comando (fim de lote no `/executar`, lote validado no `/validar`,
+publicação no `/deploy`), monte um **resumo compacto** a partir do que já existe
+nos artefatos — não crie arquivo novo. Esse resumo é o contexto que carrega para a
+próxima chamada do mesmo ou de outro comando; não recarregue o histórico detalhado
+de dispatches, revisões e fix-loops já fechados — releia os artefatos em disco
+quando precisar de detalhe específico do passado.

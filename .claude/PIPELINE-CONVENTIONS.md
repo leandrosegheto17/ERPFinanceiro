@@ -153,6 +153,13 @@ disparadas automaticamente por nenhum fluxo.
   implementação das fases anteriores, só os artefatos formais da tabela acima. Isso é
   deliberado: evita que vício de contexto de implementação influencie a revisão de
   segurança/infra.
+- **Carve-out — continuação de loop dentro da mesma etapa**: a regra acima é
+  sobre transição entre agentes/fases **distintos**, nunca sobre proibir que a
+  mesma instância de um agente continue viva ao longo de várias rodadas de
+  refinamento dentro da mesma etapa de planejamento, antes do artefato ser
+  aprovado (ver `PLANNING-FLOW.md`, mecânica de loop via `SendMessage`). O reset
+  acontece exatamente quando um artefato é congelado e o próximo agente/etapa
+  passa a lê-lo do disco — nunca no meio de um rascunho ainda em rodada de ajuste.
 
 ## 3. Convenção de nomenclatura de arquivos e pastas
 

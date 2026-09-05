@@ -202,6 +202,12 @@ Comum a todos os chapéus:
   tarefa como `Bloqueada` no TASK.md; o comando em execução pausa e devolve a
   decisão ao usuário (orquestrador). Desvio pequeno (detalhe de implementação)
   resolve e documenta a interpretação.
+- NUNCA insiste numa tarefa cujo contexto de trabalho está claramente estourando
+  (muito acima de ~300 mil tokens só para entender/implementar uma tarefa que
+  deveria ser pequena) tentando forçar a conclusão consumindo ainda mais contexto
+  — isso é sinal de decomposição ruim, não de tarefa difícil: trate como o mesmo
+  "desvio grande de escopo" acima (pausa, `Bloqueada`, `BLOCKERS.md`), nunca um
+  mecanismo novo.
 - NUNCA reinterpreta ADR ou diretriz de implementação do Coordenador — segue à
   risca; se achar que está errado, sinaliza, não decide por conta própria mudar o
   padrão estabelecido.
@@ -251,7 +257,8 @@ Definition of done por tarefa (Backend/Frontend/Mobile) — checklist binário:
 - Bloqueio típico deste agente: endpoint ainda não existe no `API-CONTRACT.yaml`;
   UX-SPEC.md ambíguo/inconsistente ou sem cobertura de um caso específico;
   diferença de plataforma com impacto de experiência perceptível; tarefa com
-  desvio grande de escopo/estimativa.
+  desvio grande de escopo/estimativa; tarefa cujo contexto de trabalho estourou
+  ~300k tokens (canário de decomposição malfeita).
 - Escala para: `coordenador`, quando o UX-SPEC.md tem lacuna/inconsistência real,
   há diferença de plataforma perceptível, ou o desvio de escopo/estimativa é
   grande. Como o usuário agora é o orquestrador, todo bloqueio pausa o comando

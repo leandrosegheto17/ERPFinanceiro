@@ -101,10 +101,12 @@ Repita até a fila esvaziar ou um bloqueio parar o fluxo:
      ao usuário o que falhou nas 2 tentativas e perguntando como seguir. Não
      insista numa 4ª tentativa por conta própria.
 4. **Marque a tarefa `Concluída`** no `TASK.md` quando a revisão passar.
-5. Se o Executor sinalizar um desvio grande de escopo/estimativa, ou uma
-   lacuna/inconsistência no `UX-SPEC.md`/`SDD.md`: **pare o comando aqui** (ver
-   Seção 4) — não decida por conta própria, não redisparur o Coordenador
-   sozinho.
+5. Se o Executor sinalizar um desvio grande de escopo/estimativa (isso inclui o
+   canário de ~300k tokens de `executor.md` — contexto de trabalho estourando
+   muito além disso para uma única tarefa é um desvio de escopo, tratado do mesmo
+   jeito, nunca empurrado com mais fix-loop), ou uma lacuna/inconsistência no
+   `UX-SPEC.md`/`SDD.md`: **pare o comando aqui** (ver Seção 4) — não decida por
+   conta própria, não redisparur o Coordenador sozinho.
 6. Recalcule a fila (uma tarefa `Concluída` pode ter liberado outra do mesmo
    lote) e volte ao passo 1.
 
@@ -147,6 +149,13 @@ param por achado crítico/bloqueio real, nunca por achado simples/débito
 baixo-médio. Rodar `/validar --continuar` separadamente continua útil para
 alcançar lotes que fecharam fora de uma sessão de `/executar --continuar` (ex.:
 implementados manualmente, ou numa chamada anterior sem `--continuar`).
+
+**Infra em paralelo (oportunista)**: se `.md/DEPLOY.md` ainda não existir e o
+`SDD.md` já estiver aprovado, este é um bom momento para disparar em paralelo o
+mesmo dispatch de preparação de infraestrutura do chapéu DevOps (Comando 3, Seção
+1) — sem esperar a primeira chamada de `/deploy`. Isso não pausa nem bloqueia o
+`/executar`, é só aproveitar a sessão longa para adiantar trabalho que já é
+declarado como paralelo à implementação em `validador.md`.
 
 ---
 
@@ -265,12 +274,22 @@ validação em andamento nunca é interrompida no meio por causa do intervalo.
 |---|---|---|---|
 | Usuário roda `/deploy` | `validador` (confirmação final + chapéu DevOps) | Provisiona infra/CI-CD (1ª vez), confirma validação, publica | Sempre antes de produção; achado bloqueante na confirmação final |
 
-### 1. Preparação de infraestrutura (só na primeira chamada do projeto)
+### 1. Preparação de infraestrutura (normalmente já feita antes da primeira chamada)
 
 Se `.md/DEPLOY.md` ainda não existir (nenhum deploy anterior): dispare `validador`
 (chapéu DevOps: `infrastructure-as-code-provisioning`,
 `cicd-pipeline-configuration`) a partir do `SDD.md`/`GUARDRAILS.md` já aprovados.
 Isso não depende de nenhum lote específico — é preparação de projeto.
+
+`validador.md` já declara que o chapéu DevOps prepara infra/CI-CD "em paralelo à
+implementação", assim que o `SDD.md` é aprovado pelo usuário — não precisa esperar
+o primeiro `/deploy`. Na prática, o orquestrador pode (e deve, quando fizer
+sentido) disparar esse mesmo dispatch de forma proativa durante uma sessão longa
+de `/executar --continuar`, assim que o `SDD.md` for aprovado (ver Comando 1,
+fim da Seção 3) — puramente oportunista, não bloqueia nem pausa nada. Esta Seção 1
+continua existindo como rede de segurança: se por algum motivo isso não aconteceu
+antes, `/deploy` garante a preparação na primeira chamada, do jeito que já
+funcionava.
 
 ### 2. Determinar o que vai ser publicado
 

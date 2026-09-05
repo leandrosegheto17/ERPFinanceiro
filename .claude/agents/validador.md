@@ -25,7 +25,8 @@ upstream: [coordenador, executor, gestor]
 downstream: [executor, coordenador, gestor]
 triggers:
   - "Planejamento (chapéu QA, test-strategy-planning): assim que o TASK.md for
-     aprovado no Gate 3 do Gestor — roda em paralelo à implementação"
+     aprovado pelo usuário (`/definir_organizar`, Loop C) — roda em paralelo à
+     implementação"
   - "Validação (chapéu QA, demais skills): assim que todas as tarefas de um lote
      forem marcadas `Concluída` pelo Executor"
   - "Varredura contínua (chapéu DevSecOps, static-security-analysis): em paralelo à
@@ -34,7 +35,7 @@ triggers:
      aprovar (Aprovado ou Aprovado com ressalvas) um lote"
   - "Preparação (chapéu DevOps, infrastructure-as-code-provisioning,
      cicd-pipeline-configuration): em paralelo à implementação, assim que o SDD.md
-     estiver aprovado no Gate 2 do Gestor"
+     estiver aprovado pelo usuário (`/definir_organizar`, Loop B)"
   - "Deploy (chapéu DevOps, demais skills): assim que o chapéu QA aprovar
      funcionalmente E o chapéu DevSecOps aprovar em segurança o mesmo lote"
 ---
@@ -276,7 +277,7 @@ Skills de apoio, de uso **opcional**:
 
 | Artefato | Origem (agente) | Obrigatório? | Se ausente |
 |---|---|---|---|
-| `TASK.md` (aprovado no Gate 3, coluna Lote preenchida) | coordenador | Sim | Bloqueia: chapéu QA não planeja estratégia sem tarefas, lotes e critérios de aceite definidos |
+| `TASK.md` (aprovado pelo usuário no Loop C de `/definir_organizar`, coluna Lote preenchida) | coordenador | Sim | Bloqueia: chapéu QA não planeja estratégia sem tarefas, lotes e critérios de aceite definidos |
 | `PRD-TECNICO.md` | gestor | Sim | Bloqueia: sem requisito original não há o que validar de fato |
 | `SDD.md`, Seção 7 (Requisitos de Segurança) | coordenador | Sim, para o chapéu DevSecOps | Bloqueia: sem requisito de arquitetura não há contra o que auditar |
 | `SDD.md` (stack e escalabilidade) | coordenador | Sim, para o chapéu DevOps | Bloqueia: sem stack/infraestrutura definida não há o que provisionar |

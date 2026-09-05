@@ -104,6 +104,26 @@ aprova, pede ajuste ou reprova.
   não significa lote pequeno: o tamanho do lote continua sendo o de uma
   funcionalidade/módulo coerente (ex.: "cadastro de paciente"); dentro dele, quanto
   mais fina a tarefa, maior o paralelismo real na execução.
+- **Tamanho-alvo**: ~1 dia-pessoa de esforço por tarefa para o dono (chapéu que a
+  executa) — referência prática de calibração via `effort-estimation`, não
+  cronômetro rígido; se a estimativa aponta algo nitidamente maior, é sinal de
+  dividir mais, nunca de aceitar como está.
+- **Não-mistura**: nenhuma tarefa cobre, ao mesmo tempo, mais de um item de: (a)
+  tela/fluxo de tela; (b) endpoint de API; (c) regra de negócio distinta do
+  `PRD-TECNICO.md`; (d) mudança de schema/SQL (migration) — salvo inseparabilidade
+  genuína, documentada explicitamente na Seção 6 do TASK.md, nunca decidida em
+  silêncio.
+- **Canário de ~300 mil tokens** (preventivo, na decomposição): se for razoável
+  prever que o Executor vai precisar de mais de ~300k tokens de contexto de
+  trabalho (código a reler, arquivos relacionados, histórico de decisão volumoso)
+  para concluir a tarefa como especificada, divida-a antes de publicar no
+  `TASK.md`. Mesmo número usado pelo Executor como canário em **tempo real**
+  durante a execução (ver `executor.md`) — aqui é a checagem preventiva antes da
+  tarefa existir; lá é o sinal de que uma tarefa já deveria ter sido dividida.
+  Essas mesmas três regras (tamanho-alvo, não-mistura, canário) valem também para
+  tarefas do lote `Refatoração Lote-X` que o Validador cria — na prática raramente
+  mudam algo ali, já que um achado simples tende a ser pequeno por definição, mas
+  não é uma exceção implícita.
 - Agrupar as tarefas em **lotes**, alinhados aos clusters de dependência sempre que
   possível.
 - Mapear explicitamente, na Seção 4 do TASK.md, quais tarefas de um mesmo lote são
@@ -245,7 +265,11 @@ Uma skill de apoio, de uso **opcional**:
   `technical-spike-identification`.
 - NUNCA atribui tarefa sem critério de aceite testável, nem decompõe uma tarefa
   grande demais para caber num único ciclo de implementação — a granularidade fina
-  é requisito de aceite do próprio TASK.md, não uma preferência.
+  é requisito de aceite do próprio TASK.md, não uma preferência. Concretamente:
+  tamanho-alvo ~1 dia-pessoa, sem misturar mais de uma tela/endpoint/regra de
+  negócio/mudança de SQL na mesma tarefa (salvo inseparabilidade documentada), e
+  sem exigir do Executor mais de ~300k tokens de contexto de trabalho previstos —
+  ver os três itens acima.
 - NUNCA agrupa em um lote tarefas que não têm relação de funcionalidade/módulo só
   para preencher um número redondo, nem deixa de marcar explicitamente quais
   tarefas do lote são paralelizáveis entre si.
@@ -307,6 +331,14 @@ ressalvas/Reprovado sobre o próprio trabalho; quem decide isso agora é o usuá
 - [ ] Nenhum lote muito acima de ~5-6 tarefas sem justificativa
 - [ ] Toda tarefa não-spike tem estimativa; toda tarefa de incerteza alta está
       marcada como spike, sem estimativa forçada
+- [ ] Toda tarefa calibrada a ~1 dia-pessoa (ou com justificativa explícita na
+      Seção 6 para ser maior)
+- [ ] Nenhuma tarefa mistura mais de uma tela/endpoint/regra de negócio/mudança de
+      SQL, salvo justificativa de inseparabilidade
+- [ ] Nenhuma tarefa, pela estimativa do Coordenador, deve exigir do Executor mais
+      de ~300 mil tokens de contexto de trabalho
+- [ ] Todo autocheck de granularidade que resultou em divisão automática está
+      documentado (breve antes/depois), não só o resultado final
 - [ ] Toda diretriz de implementação relevante está traduzida em regra prática
 - [ ] Toda lacuna estrutural encontrada está sinalizada na Seção 6, nunca decidida
       em silêncio

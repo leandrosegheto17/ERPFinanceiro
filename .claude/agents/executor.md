@@ -205,9 +205,14 @@ Comum a todos os chapéus:
 - NUNCA insiste numa tarefa cujo contexto de trabalho está claramente estourando
   (muito acima de ~300 mil tokens só para entender/implementar uma tarefa que
   deveria ser pequena) tentando forçar a conclusão consumindo ainda mais contexto
-  — isso é sinal de decomposição ruim, não de tarefa difícil: trate como o mesmo
-  "desvio grande de escopo" acima (pausa, `Bloqueada`, `BLOCKERS.md`), nunca um
-  mecanismo novo.
+  — isso é sinal de decomposição ruim, não de tarefa difícil: sinalize
+  explicitamente ao voltar (não só deixe o orquestrador descobrir sozinho) e trate
+  como o mesmo "desvio grande de escopo" acima (pausa, `Bloqueada`,
+  `BLOCKERS.md`), nunca um mecanismo novo. Esse canário é checado de dois jeitos
+  complementares: você mesmo percebendo no meio da tarefa que o escopo é maior do
+  que devia, e o orquestrador conferindo o campo `subagent_tokens` do resultado do
+  seu próprio dispatch assim que você retorna (mecânico, não depende de você
+  perceber — ver `EXECUTION-FLOW.md`, Comando 1, "Rodada paralela").
 - NUNCA reinterpreta ADR ou diretriz de implementação do Coordenador — segue à
   risca; se achar que está errado, sinaliza, não decide por conta própria mudar o
   padrão estabelecido.

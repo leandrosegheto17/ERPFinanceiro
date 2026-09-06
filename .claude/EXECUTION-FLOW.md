@@ -90,24 +90,31 @@ Repita até a fila esvaziar ou um bloqueio parar o fluxo:
    executor`, `run_in_background: false` — a revisão seguinte depende do
    resultado), uma por tarefa. O prompt de cada dispatch: a tarefa específica do
    `TASK.md` (não o arquivo inteiro) e seu critério de aceite.
-3. **Para cada tarefa que voltar**, rode a revisão inline (você, o executor do
-   comando — não um agente separado) contra o `git diff` daquela tarefa
-   especificamente: spec-compliance (bate com o critério de aceite e as
-   diretrizes de implementação) + qualidade de código (skill `code-review`).
+3. **Assim que cada instância voltar, confira o canário de contexto antes de
+   qualquer outra coisa**: olhe o campo `subagent_tokens` no resultado do próprio
+   dispatch (`Agent`) daquela tarefa. Isso é mecânico — não depende do Executor
+   perceber ou reportar nada. Se passar de ~300 mil tokens para uma única tarefa:
+   trate como o item 6 abaixo (desvio grande de escopo) **imediatamente**, mesmo
+   que a revisão inline do item 4 ainda não tenha rodado — não vale a pena gastar
+   fix-loop numa tarefa que já provou estar mal decomposta.
+4. **Para cada tarefa que passou pelo item 3 sem estourar o canário**, rode a
+   revisão inline (você, o executor do comando — não um agente separado) contra o
+   `git diff` daquela tarefa especificamente: spec-compliance (bate com o
+   critério de aceite e as diretrizes de implementação) + qualidade de código
+   (skill `code-review`).
    - **Achado**: devolva para a mesma instância do Executor corrigir, e revise de
      novo — fix-loop, **máximo 2 tentativas**, sem pausar entre elas.
    - **3ª falha consecutiva na mesma tarefa**: **pare** — marque a tarefa
      `Bloqueada`, registre `BLOCKERS.md`, e **encerre o comando aqui**, explicando
      ao usuário o que falhou nas 2 tentativas e perguntando como seguir. Não
      insista numa 4ª tentativa por conta própria.
-4. **Marque a tarefa `Concluída`** no `TASK.md` quando a revisão passar.
-5. Se o Executor sinalizar um desvio grande de escopo/estimativa (isso inclui o
-   canário de ~300k tokens de `executor.md` — contexto de trabalho estourando
-   muito além disso para uma única tarefa é um desvio de escopo, tratado do mesmo
-   jeito, nunca empurrado com mais fix-loop), ou uma lacuna/inconsistência no
+5. **Marque a tarefa `Concluída`** no `TASK.md` quando a revisão passar.
+6. Se o Executor sinalizar um desvio grande de escopo/estimativa, se o canário de
+   contexto do item 3 disparar, ou se houver uma lacuna/inconsistência no
    `UX-SPEC.md`/`SDD.md`: **pare o comando aqui** (ver Seção 4) — não decida por
-   conta própria, não redisparur o Coordenador sozinho.
-6. Recalcule a fila (uma tarefa `Concluída` pode ter liberado outra do mesmo
+   conta própria, não redisparur o Coordenador sozinho. Tratamento igual nos três
+   casos: pausa, `Bloqueada`, `BLOCKERS.md`, nunca empurrado com mais fix-loop.
+7. Recalcule a fila (uma tarefa `Concluída` pode ter liberado outra do mesmo
    lote) e volte ao passo 1.
 
 **Dependência de contrato de API**: não orquestre isso manualmente — `executor.md`

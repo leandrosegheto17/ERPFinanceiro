@@ -358,3 +358,73 @@ deploy do Lote 1 (junto do Lote 0, se ainda não implantado), sujeito à sua
 própria Definition of Done (rollback testado, observabilidade ativa,
 infraestrutura validada contra requisitos não funcionais do SDD.md) — débito
 de baixa/média severidade registrado com prazo não pausa o deploy.
+
+---
+
+# Refatoração Lote-1 — Fechamento de DEVSEC-L1-01 (auditoria de segurança)
+
+- **Data**: 2026-09-07
+- **Base**: `.md/TASK.md` (seção "Refatoração Lote-1", REFAT-L1-01,
+  `Concluída`), `.md/QA-REPORT.md` (seção "Refatoração Lote-1 — REFAT-L1-01",
+  Aprovado), `.md/SECURITY-REVIEW.md` (seção "Lote 1", achado original
+  DEVSEC-L1-01)
+- **Pré-condição verificada**: `QA-REPORT.md` aprovou funcionalmente
+  `Refatoração Lote-1`/REFAT-L1-01 antes desta auditoria começar.
+- **Método**: toda checagem abaixo foi executada de forma independente nesta
+  sessão (leitura direta de `.dependency-cruiser.cjs`, comando de CLI real,
+  probe próprio — não o probe já usado e removido pelo Executor nem o
+  reaproveitado pelo QA), não a partir das notas de implementação do Executor
+  nem da evidência do chapéu QA.
+
+## 1. Execução Independente — Evidência
+
+| Comando | Resultado |
+|---|---|
+| Leitura direta de `.dependency-cruiser.cjs` | Regra `no-tools-from-core` presente, mesmo padrão estrutural de `no-features-from-core`: mesmo `from: { path: "(^\|[\\\\/])core[\\\\/]" }`, `to` trocado para `(^\|[\\\\/])tools[\\\\/]`, `severity: "error"`; comentário de cabeçalho do arquivo cita ADR-003 e as duas regras |
+| Probe próprio e independente: criado `src/core/__devsecops_probe_devsec_l1_01.ts`, importando `CANONICAL_BOOK_IDS` (símbolo distinto do usado pelo Executor/`no-features-from-core` probe e do usado pelo QA) de `src/tools/corpus-import/canon.ts` | `npx depcruise src --config .dependency-cruiser.cjs` (comando direto, não via `npm run lint`) reportou `error no-tools-from-core: src/core/__devsecops_probe_devsec_l1_01.ts → src/tools/corpus-import/canon.ts`, com resumo `1 dependency violations (1 errors, 0 warnings). 36 modules, 62 dependencies cruised.` e **exit code 1** |
+| Probe removido (`rm`) | `npm run lint` (eslint + `lint:deps`) voltou a `"no dependency violations found (35 modules, 61 dependencies cruised)"`, exit code 0 |
+| `npm run build` (`tsc -b && vite build`) | Limpo — `dist/index.html`, `dist/manifest.json`, `dist/assets/index-*.js`, `dist/sw.js`, `dist/workbox-*.js`, `dist/registerSW.js` gerados sem erro; nenhum efeito colateral da nova regra de lint no build (esperado — é checagem estática, sem código de runtime novo) |
+| `npx vitest run src/tools/dependency-rule.test.ts` (isolado) | 4/4 verdes — os 2 casos de `no-features-from-core` e os 2 casos novos de `no-tools-from-core` (`src/` real limpo + fixture `core -> tools` reprovada) |
+| `npm run test:security` (SAST rápido de exposição de dado sensível no bundle, contra `dist/` real pós-build) | 11/11 verdes — nenhum segredo de serviço, nenhuma string proibida (DI-05) no bundle publicado |
+| `git status --short` após a rodada completa | Confirma ausência de qualquer arquivo de probe remanescente — só as 4 edições legítimas já rastreadas (`.dependency-cruiser.cjs`, `.md/QA-REPORT.md`, `.md/TASK.md`, `src/tools/dependency-rule.test.ts`) aparecem como modificadas; nenhum arquivo novo/untracked |
+
+## 2. Reavaliação do Achado DEVSEC-L1-01
+
+- **Vetor original demonstrado nesta auditoria do Lote 1**: import "puro" de
+  `tools/corpus-import` para dentro de `core/*`, encadeado até o entrypoint
+  real do app, passava por `lint:deps` e por `npm run build` sem erro, com o
+  conteúdo importado aparecendo no bundle publicado.
+- **Estado hoje**: a mesma classe de import (`core/* → tools/*`, símbolo
+  "puro" sem dependência de Node) agora é pega mecanicamente por
+  `lint:deps`, confirmado por um probe próprio e independente desta rodada
+  (Seção 1) — exit code 1, mensagem citando exatamente `no-tools-from-core`.
+  A checagem não depende de `tsc -b` falhar incidentalmente por falta de
+  tipos Node (a limitação original do achado): o probe usado aqui
+  (`CANONICAL_BOOK_IDS`, um array de strings) não usa nenhum símbolo Node e
+  ainda assim foi bloqueado.
+- **Veredito**: o vetor concreto que originou DEVSEC-L1-01 está **fechado**.
+  A lacuna mecânica na fronteira `core/*` × `tools/*` não existe mais —
+  `core/* → tools/*` agora falha lint do mesmo jeito que `core/* →
+  features/*` já falhava.
+- **Nova exposição introduzida pela mudança**: nenhuma. É uma regra de lint
+  em tempo de análise estática, sem código de runtime novo; `npm run build`
+  permanece limpo e o bundle publicado (`dist/`) segue sem segredo nem
+  string proibida (Seção 1, `test:security`). Nenhum arquivo de prova
+  residual no repositório (`git status --short` limpo de untracked).
+- **Compliance obrigatório**: nenhum aplicável (mesma nota da auditoria
+  original do Lote 1 — G-07 é arquitetura/defesa em profundidade, não
+  compliance regulatório).
+- **Relevância estratégica ao Gestor**: nenhuma nesta rodada — fechamento de
+  débito técnico já registrado, dentro da autoridade normal do Validador.
+
+## 3. Veredito Geral do Lote Refatoração Lote-1 (chapéu DevSecOps)
+
+**Refatoração Lote-1: Aprovado.** Nenhum achado de severidade alta/crítica
+ou compliance obrigatório em aberto. DEVSEC-L1-01 está **fechado**, não
+parcialmente — o vetor demonstrado na auditoria original não passa mais por
+`lint:deps`, sem efeito colateral em build/bundle. Combinado com a aprovação
+funcional já registrada em `.md/QA-REPORT.md` (seção "Refatoração Lote-1 —
+REFAT-L1-01", Aprovado), o lote `Refatoração Lote-1` tem **dupla aprovação**
+(QA + DevSecOps). O chapéu DevOps pode prosseguir com deploy, sujeito à sua
+própria Definition of Done — não há débito de segurança pendente deste
+achado para carregar adiante.

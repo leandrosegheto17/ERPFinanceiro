@@ -602,3 +602,107 @@ Nenhum padrão recorrente de bug que sugira problema de decomposição ou
 diretriz de implementação foi observado neste lote — as 6 tarefas passaram
 na primeira submissão, com evidência de teste genuína (não superficial) em
 cada uma; não escala ao `coordenador`.
+
+---
+
+# Refatoração Lote-1 — REFAT-L1-01 (débito de defesa em profundidade, Lote 1)
+
+- **Data**: 2026-09-07
+- **Base**: `.md/TASK.md` (seção "Refatoração Lote-1"), `.md/QA-REPORT.md`
+  (seção "Lote 1", Seção 5, achado original REFAT-L1-01),
+  `.md/SECURITY-REVIEW.md` (seção "Lote 1", achado DEVSEC-L1-01)
+- **Método**: todo comando abaixo foi executado de forma independente nesta
+  sessão (não a partir da nota de implementação do Executor no `TASK.md`, que
+  serviu só de referência de onde olhar) — incluindo um probe real e
+  autônomo em `src/`, distinto do probe que o próprio Executor já havia usado
+  e removido durante a implementação.
+
+## 1. Execução Independente — Evidência
+
+| Comando | Resultado |
+|---|---|
+| Leitura direta de `.dependency-cruiser.cjs` | Confirma a nova regra `no-tools-from-core` no mesmo padrão estrutural de `no-features-from-core`: mesmo `from` (`core/*`), `to` trocado para `tools/*`, `severity: "error"`; comentário de cabeçalho do arquivo atualizado citando ADR-003 e as duas regras |
+| `npm run lint` (eslint + `lint:deps`) | Limpo — `"no dependency violations found (35 modules, 61 dependencies cruised)"` |
+| Probe real e independente: criado `src/core/__probe_refat_l1_01.ts` importando `CANONICAL_BOOKS` de `src/tools/corpus-import/canon.ts` | `npx depcruise src --config .dependency-cruiser.cjs` reportou `error no-tools-from-core: src/core/__probe_refat_l1_01.ts → src/tools/corpus-import/canon.ts`, exit code **1** — confirma que a regra bloqueia de fato uma violação real em `src/`, não só a fixture isolada do teste automatizado |
+| Probe removido | `npm run lint` voltou a `"no dependency violations found"`, exit code 0 — sem resíduo |
+| `npx vitest run` | 7 arquivos, **64/64 testes verdes**, incluindo os 2 casos novos de `src/tools/dependency-rule.test.ts` (`describe("DI-02 / ADR-003 — dependência unidirecional core -> tools")`: `src/` real limpo pela nova regra + fixture `core -> tools` reprovada pela regra) — sem regressão nos 62 testes pré-existentes |
+| `npm run typecheck` (`tsc -b --noEmit`) | Limpo, sem erro |
+| `npm run build` (`tsc -b && vite build`) | Limpo — gera `dist/index.html`, `dist/manifest.json`, `dist/assets/index-*.js`, `dist/sw.js`, `dist/workbox-*.js`, `dist/registerSW.js` |
+| `git status --short` após a rodada completa | Confirma ausência de arquivo de probe remanescente; só as edições legítimas (`.dependency-cruiser.cjs`, `.md/TASK.md`, `src/tools/dependency-rule.test.ts`) aparecem como modificadas |
+
+## 2. Veredito por Tarefa
+
+### REFAT-L1-01 — Adicionar regra `no-tools-from-core` ao `.dependency-cruiser.cjs`
+
+**Critério de aceite**: "`npm run lint:deps` falha se `core/*` importar de
+`tools/*`, do mesmo jeito que já falha para `features/*`."
+
+- Regra presente, no mesmo padrão estrutural da regra irmã (confirmado por
+  leitura direta, Seção 1).
+- `npm run lint:deps` passa limpo hoje (nenhuma violação real no `src/`
+  atual) — coerente com o achado original, que era lacuna de cobertura
+  mecânica, não violação já existente.
+- Falha de fato quando há violação real: confirmado com um probe **próprio**
+  desta rodada (distinto do probe que o Executor já havia usado e removido),
+  criado, testado e removido de forma independente — exit code 1, mensagem
+  de erro exata citando a regra `no-tools-from-core`.
+- Teste automatizado irmão (`dependency-rule.test.ts`) cobre o mesmo cenário
+  via fixture isolada (`core -> tools`), sem depender de spawnar processo
+  CLI — os dois métodos (probe real em `src/` + fixture do teste automatizado)
+  convergem para o mesmo resultado.
+- Nenhuma regressão: suíte completa de testes, typecheck e build permanecem
+  limpos após a mudança.
+- `cross-platform-integration-testing`: **N/A** — não há múltiplas
+  plataformas envolvidas nesta tarefa (mudança de config de lint + teste
+  unitário, sem superfície mobile/web distinta a cruzar).
+- `non-functional-validation`: sem requisito não funcional novo introduzido;
+  a regra adicionada é puramente de defesa em profundidade em tempo de lint,
+  sem impacto em runtime/bundle (confirmado pelo tamanho de bundle inalterado
+  no `npm run build`).
+- Nenhum bug encontrado — `bug-documentation`: N/A.
+
+**Veredito: Aprovado.**
+
+## 3. Fechamento Estrutural do Lote (checagem do próprio Validador)
+
+- Status antes desta rodada: REFAT-L1-01 estava `Concluída` no `TASK.md`,
+  com nota de implementação do Executor detalhando a regra adicionada e a
+  verificação empírica que ele mesmo já havia feito.
+- Após esta rodada: **1 de 1 aprovada**, nenhuma reprovação (nem crítica nem
+  simples).
+- Dependência declarada na Seção 4 do `TASK.md` (REFAT-L1-01 → TASK-001):
+  satisfeita (TASK-001, que introduziu a regra irmã `no-features-from-core`,
+  está `Concluída` e aprovada desde o Lote 0). Nenhuma dependência órfã ou
+  inconsistente.
+- Nenhuma tarefa `Bloqueada` sem resolução neste lote.
+- Nenhum achado novo de severidade simples/débito nesta rodada — não há
+  necessidade de criar nova entrada em `Refatoração Lote-1` ou em qualquer
+  outro lote de refatoração.
+- Nenhuma inconsistência encontrada que exija redesenho de dependência ou
+  decomposição — não há escalonamento ao `coordenador`.
+
+## 4. Veredito Geral do Lote Refatoração Lote-1
+
+**Refatoração Lote-1: Aprovado — 1 de 1 tarefa concluída e validada**
+(REFAT-L1-01). Nenhuma reprovação em aberto, crítica ou simples. Definition
+of Done por lote (chapéu QA) satisfeita:
+
+- [x] Todo critério de aceite de cada tarefa do lote foi testado e está
+      passando
+- [x] Nenhuma reprovação crítica em aberto
+- [x] Toda reprovação simples virou tarefa em `Refatoração Lote-X` (nenhuma
+      reprovação nesta rodada)
+- [x] Testes de integração cruzada executados e passando (N/A — tarefa única
+      de config de lint/teste, sem superfície cruzada nova neste lote)
+- [x] Requisito não funcional relevante ao lote validado (N/A — sem impacto
+      em runtime/bundle)
+
+O lote **está pronto** para a auditoria de segurança do chapéu DevSecOps
+confirmar o fechamento de DEVSEC-L1-01 — ver `.md/SECURITY-REVIEW.md` — e,
+após dupla aprovação (QA + DevSecOps), para o chapéu DevOps prosseguir com
+deploy do lote consolidado.
+
+Nenhum padrão recorrente de bug que sugira problema de decomposição ou
+diretriz de implementação foi observado — achado isolado de defesa em
+profundidade, fechado na primeira submissão com evidência de verificação
+empírica independente; não escala ao `coordenador`.

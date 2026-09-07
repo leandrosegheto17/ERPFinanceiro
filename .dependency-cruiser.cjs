@@ -1,7 +1,8 @@
 /**
- * Regra de dependência unidirecional (DI-02 / GUARDRAILS G-07, ADR-001,
- * ADR-012): `core/*` é TypeScript puro e nunca importa de `features/*`.
- * Verificado por lint no CI, nunca por revisão manual.
+ * Regras de dependência unidirecional (DI-02 / GUARDRAILS G-07, ADR-001,
+ * ADR-003, ADR-012): `core/*` é TypeScript puro e nunca importa de
+ * `features/*` nem de `tools/*`. Verificado por lint no CI, nunca por
+ * revisão manual.
  *
  * `npm run lint:deps` roda esta config contra `src`. O teste automatizado em
  * `src/tools/dependency-rule.test.ts` também usa esta config (via API de
@@ -17,6 +18,14 @@ module.exports = {
       severity: "error",
       from: { path: "(^|[\\\\/])core[\\\\/]" },
       to: { path: "(^|[\\\\/])features[\\\\/]" },
+    },
+    {
+      name: "no-tools-from-core",
+      comment:
+        "core/* é TypeScript puro e nunca importa de tools/* (DI-02, ADR-003)",
+      severity: "error",
+      from: { path: "(^|[\\\\/])core[\\\\/]" },
+      to: { path: "(^|[\\\\/])tools[\\\\/]" },
     },
   ],
   options: {

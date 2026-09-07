@@ -1,0 +1,14 @@
+-- supabase/seed.sql
+--
+-- Executado por `supabase db reset` (e implicitamente por `supabase start`
+-- num banco novo) depois de todas as migrations em `supabase/migrations/`.
+--
+-- Placeholder da TASK-005 (Lote 0 — Fundação e CI). Nenhuma tabela de domínio
+-- existe ainda (schema nasce no Lote 5 — Backend: Schema e Segurança,
+-- TASK-027 em diante). Este arquivo só existe para que
+-- `db.seed.sql_paths = ["./seed.sql"]` (supabase/config.toml) resolva sem
+-- warning; passa a ter conteúdo real de seed de desenvolvimento (fixtures de
+-- corpus/conteúdo editorial) a partir do Lote 1/2.
+--
+-- Nunca inserir aqui: segredo de serviço, credencial real ou dado pessoal
+-- real de usuário (GUARDRAILS.md G-10).

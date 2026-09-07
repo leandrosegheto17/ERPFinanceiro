@@ -1,0 +1,313 @@
+# TASK.md — App de Leitura Bíblica Guiada + Preparo de Estudo
+
+- **Versão**: rascunho rodada 1 (Loop C do `/definir_organizar`)
+- **Data**: 2026-09-07
+- **Autor**: coordenador (chapéu Tech Lead)
+- **Base**: `.md/SDD.md` (aprovado), `.md/UX-SPEC.md` (aprovado), ADRs 001–012,
+  `.md/PRD-TECNICO.md`, `.md/CTO-REVIEW.md`
+- **Consumidores**: executor, validador, gestor
+- **Status**: aguardando aprovação do usuário (orquestrador)
+
+> Granularidade-alvo: ~1 dia-pessoa por tarefa. Nenhuma tarefa mistura mais de uma
+> tela / endpoint / regra de negócio distinta / migration de SQL, salvo
+> inseparabilidade documentada (marcada `[insep.]` e justificada na Seção 6).
+> Nenhuma tarefa deve exigir do Executor mais de ~300 mil tokens de contexto de
+> trabalho — ver checagem na Seção 6.
+
+---
+
+## 1. Diretrizes de Implementação
+
+Traduzidas dos ADRs e do SDD.md em regras práticas de código, obrigatórias em toda
+tarefa deste documento.
+
+| # | Diretriz | Origem |
+|---|---|---|
+| DI-01 | Regra de negócio existe **uma vez**, no cliente (`core/*` ou `features/*`). O servidor (Supabase) nunca reimplementa uma regra já implementada no cliente — só propriedade de linha (RLS) e conciliação | ADR-002 |
+| DI-02 | `core/*` é TypeScript puro, sem React nem DOM. Nenhum import de `features/*` para dentro de `core/*` (dependência unidirecional verificada por lint, tarefa TASK-001) | ADR-001, ADR-012 |
+| DI-03 | Toda tabela com coluna `user_id` nasce com RLS habilitada **na mesma migration** que a cria. Uma migration que cria tabela sem política de RLS é defeito de severidade máxima (RT-04) | SDD §7.2, GUARDRAILS |
+| DI-04 | Nenhum HTML de usuário ou de acervo editorial é injetado sem sanitização | SDD §7.7, ADR-004 |
+| DI-05 | O produto nunca renderiza as strings "Almeida Atualizada", "ARA" ou "ARC", em nenhuma tela, nenhum commit, nenhum texto de acervo | CTO-REVIEW R-02, RN-06 |
+| DI-06 | Toda tela nova é cruzada contra os 4 estados (vazio, carregando, erro, sucesso) antes de ser marcada `Concluída`; "N/A" só com motivo escrito no PR | UX-SPEC §4 |
+| DI-07 | Nenhuma informação de estado é transmitida só por cor — todo selo/indicador tem ícone **e** texto | UX-SPEC §5.1 (1.4.1) |
+| DI-08 | Alvo de toque mínimo 44×44 px (48×48 em T-20); reordenação por arrastar sempre tem alternativa por botão ↑/↓ | UX-SPEC §3.1, §5.1 (2.5.7/2.5.8) |
+| DI-09 | Nenhum segredo de serviço (chave VAPID privada, credencial de service role) é gravado em código de cliente ou em variável exposta ao bundle; todo PR que tocar credenciais roda o teste de grep do bundle (TASK-042) | SDD §7.1, §7.5 |
+| DI-10 | `localStorage` nunca recebe conteúdo do usuário nem segredo além do necessário; conteúdo do usuário só em IndexedDB (Dexie) | SDD §7.1, §7.3 |
+| DI-11 | Dentro da rota de `features/presentation` (T-20), nenhuma UI fora do cartão é renderizada, e a fila de mensagens do app (convites, toasts de sincronização) é suspensa enquanto a rota estiver ativa | UX-SPEC T-20, CA-14.2/14.3 |
+| DI-12 | Toda migration nova roda contra o teste de catálogo de RLS (TASK-033) antes de merge — é gate de CI, não revisão manual | RT-04 |
+| DI-13 | Módulo 2 (`features/outline`, `features/presentation`) nunca é importado por código da Fase 1; a rota do Módulo 2 só é registrada quando há sessão válida | ADR-012, SDD §7.1 |
+| DI-14 | Testes de acessibilidade e de contraste são automatizados (axe/Playwright + teste de par de token), nunca inspeção manual isolada | UX-SPEC §5 |
+| DI-15 | Bibliotecas obrigatórias por camada: Dexie (storage local), Radix Primitives (só em overlays), Workbox via `vite-plugin-pwa` (SW), Vitest (unidade), Playwright (e2e). Proibido: qualquer SDK de analytics/anúncio de terceiro, qualquer fonte web externa, qualquer biblioteca de streak/gamificação | SDD §3, RNF-13, CSP §7.5 |
+
+## 2. Spikes Técnicos
+
+Tarefas de incerteza técnica alta, sem estimativa de esforço forçada — o produto é
+conhecimento, não código funcional. Bloqueiam a tarefa de implementação associada
+até serem resolvidos.
+
+| ID | Spike | Pergunta a responder | Bloqueia | Origem do risco |
+|---|---|---|---|---|
+| SPIKE-01 | Confiabilidade de Web Push em Safari/iOS PWA instalado | Cobertura real de entrega, latência típica, comportamento com app fechado; decidir se o texto de T-12 precisa de ressalva adicional | TASK-056 a TASK-061 | RT-02 |
+| SPIKE-02 | Comportamento de `storage.persist()` e expurgo de armazenamento gravável em Safari/iOS, com e sem PWA instalado | Confirmar a janela real de expurgo (~7 dias) e a eficácia de `persist()`; decidir gatilho exato do convite de instalação em T-15/T-19 | TASK-067, TASK-081, TASK-083 | RT-01 |
+| SPIKE-03 | Gramática de reconhecimento de referência bíblica em pt-BR: abreviações ambíguas, intervalos entre capítulos, variações de digitação reais | Fechar a tabela de abreviações e a lista de casos "não resolvido" antes de escrever a suíte simétrica | TASK-010 | RT-05, ADR-005 |
+| SPIKE-04 | Suporte cross-browser do Screen Wake Lock API e estratégia de fallback quando indisponível | Confirmar navegadores sem suporte real na base esperada e o texto de aviso correspondente em T-19 | TASK-085 | UX-SPEC T-20 (CA-14.4), L-05 |
+
+**SPIKE-03 — Resolvido (2026-09-07)**: tabela de abreviações dos 66 livros
+fechada, gramática de espaçamento/separadores decidida, e lista de casos "não
+resolvido" fechada — incluindo uma ambiguidade real encontrada (colisão
+"Jó"×"Jo" após normalização de acento) e sua resolução. Ver
+`.md/spikes/SPIKE-03-resultado.md`. TASK-010 desbloqueada.
+
+## 3 / 4. Lista de Tarefas, Lotes, Dependências e Paralelismo
+
+Convenção: **Paralelizável-com** lista as tarefas do mesmo lote que podem começar
+sem esperar a tarefa da linha terminar. **Depende de** lista pré-requisitos de
+qualquer lote. Todas as tarefas são Fase 1, salvo Lote 14/15 (Fase 2). Estimativa
+padrão = **1 dia-pessoa** (dono: Executor); desvio é marcado explicitamente.
+
+### Lote 0 — Fundação e CI
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com | Status |
+|---|---|---|---|---|---|
+| TASK-001 | Scaffold do projeto (Vite+React+TS, pastas `core/*`/`features/*`/`tools/*`) e lint de dependência unidirecional (DI-02) | Build limpo; lint falha se `core` importar de `features` | — | TASK-005 | Concluída — scaffold Vite+React+TS manual (`package.json`, `tsconfig*.json`, `vite.config.ts`, `eslint.config.js`) com `src/core`, `src/features/shell`, `src/tools`; regra unidirecional via `dependency-cruiser` (`.dependency-cruiser.cjs`, rule `no-features-from-core`, `npm run lint:deps`), com regex cross-plataforma (`\\`/`/`) para funcionar em Windows. Teste automatizado (`src/tools/dependency-rule.test.ts`, Vitest + API `dependency-cruiser`) cobre as duas pontas do critério de aceite: `src` real passa limpo, e uma fixture que força `core` a importar de `features` é reprovada pela mesma regra (`no-features-from-core`, severidade `error`). Confirmado também via CLI real (`npx depcruise`): exit 0 no `src` limpo, exit 1 ao inserir um import real `core → features` temporário (removido depois do smoke test). `npm run build`, `npm run typecheck`, `npm run lint` e `npx vitest run` passam limpos. `npm run dev`/`preview` disponíveis; CI (TASK-002), PWA (TASK-003) e Playwright (TASK-004) ficam para as tarefas seguintes do lote. |
+| TASK-002 | Pipeline CI (GitHub Actions): lint, typecheck, teste unitário, build | Workflow verde em PR de exemplo | TASK-001 | TASK-003, TASK-004 | Concluída — workflow `.github/workflows/ci.yml` (job único `build`, Node 24 via `actions/setup-node` com cache npm, gatilho `push`/`pull_request` em `main`, `concurrency` por ref) executando em sequência `npm ci`, `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`. YAML validado sintaticamente (`python -c "import yaml; yaml.safe_load(...)"`, sem erro). Os 4 comandos foram executados localmente contra o estado atual do repo (após TASK-003/TASK-004 já terem adicionado `vite-plugin-pwa`/Workbox e Playwright em paralelo) e passam limpos: lint (eslint + `lint:deps`, "no dependency violations found"), typecheck (`tsc -b --noEmit` sem erro), test (`vitest run`, 2/2 testes verdes), build (`tsc -b && vite build`, gera `dist/` com `sw.js`/`workbox-*.js` via PWA). Observação de ambiente (não é defeito do workflow): como três instâncias do Executor rodaram em paralelo no mesmo checkout (sem worktrees separados), houve corrupção transitória de `node_modules` por instalações npm concorrentes (`ENOTEMPTY`, módulos parcialmente escritos) durante a validação local — resolvida reexecutando `npm install`; o workflow do GitHub Actions roda em runner isolado por job e não sofre esse tipo de contenção. Nenhuma edição destrutiva feita em `package.json`/`vite.config.ts` (só leitura, para conferir os scripts já existentes). |
+| TASK-003 | `vite-plugin-pwa` + Workbox: shell básico instalável | App instala localmente; manifest.json válido | TASK-001 | TASK-002, TASK-004 | Concluída — `vite-plugin-pwa` (`^1.3.0`) adicionado a `vite.config.ts` (edição cirúrgica, sem reescrever o arquivo) com manifest inline (`name`/`short_name`/`start_url: "/"`/`scope: "/"`/`display: "standalone"`/`lang: "pt-BR"`, ícones `192x192`, `512x512` e `512x512 maskable` em `public/icons/`, gerados como PNG placeholder — arte final é tarefa de design, fora de escopo) e `manifestFilename: "manifest.json"`. `workbox.globPatterns` restrito a `**/*.{js,css,html}` — só o app shell entra no precache aqui; estratégias de cache por artefato (corpus/conteúdo editorial) ficam para TASK-066 e `storage.persist()` para TASK-067 (Lote 13), como delimitado no escopo desta tarefa. Teste automatizado (`src/tools/pwa/pwa-manifest.test.ts`, Vitest) roda um build real via API programática do Vite (mesmo `vite.config.ts`, sem duplicar config) contra um outDir temporário e confirma as duas pontas do critério de aceite: `manifest.json` gerado é JSON válido com os campos mínimos de instalabilidade (name/short_name/start_url/display/ícones 192+512, cada ícone referenciado existindo de fato no output) e o plugin gera um Service Worker real (`sw.js` não vazio, contém Workbox — DI-15) no build; confirma também o `<link rel="manifest">` no `index.html`. `npm run build` confirmado manualmente: gera `dist/manifest.json`, `dist/sw.js`, `dist/workbox-*.js`, `dist/registerSW.js`; `npm run lint`, `npm run typecheck`, `npx vitest run` e `npx playwright test` (suíte e2e de TASK-004) permanecem verdes — `playwright.config.ts` roda contra `vite dev` (não o build), e `devOptions.enabled: false` neste `vite.config.ts` garante que o Service Worker não é registrado em modo dev, então `e2e/placeholder.spec.ts` continua testando exatamente o cenário "sem SW" que seu comentário descreve; nenhuma dessincronia entre as duas tarefas. Durante a execução desta tarefa, ambiente local apresentou corrupção pontual e recorrente em `node_modules` (`es-abstract`, `@babel/types`, `caniuse-lite`, `vite`) por corrida de instalações `npm` concorrentes de outras instâncias do Executor no mesmo lote — corrigido via reinstalação pontual de cada pacote afetado; nenhuma mudança de código foi necessária por isso, mas registrado aqui como risco operacional de paralelismo em `node_modules` compartilhado. |
+| TASK-004 | Setup Vitest + Playwright, incl. config de rede desligada e cache limpo | Teste unitário e e2e placeholder passam em CI | TASK-001 | TASK-002, TASK-003 | Concluída — correção do achado crítico do Validador (`.md/QA-REPORT.md`, Seção 2, TASK-004): `.github/workflows/ci.yml` (job `build`) recebeu 2 novos steps, em edição cirúrgica após o step `Build` — `Install Playwright browsers (Chromium)` (`npx playwright install --with-deps chromium`) e `E2E tests` (`npm run test:e2e`) — nenhum step pré-existente foi removido/reescrito. Como `playwright.config.ts` já define `webServer` (servidor de dev do Vite, `reuseExistingServer: !process.env.CI`), o próprio Playwright sobe o servidor dentro do runner de CI, sem step adicional de `preview`. YAML revalidado sintaticamente (`python -c "import yaml; yaml.safe_load(...)"`, sem erro) e `npx playwright install --with-deps chromium && npx playwright test` confirmado localmente contra o estado atual do repo: 2/2 verdes ("renderiza o shell do app", "cache limpo + rede desligada bloqueia nova navegação"). Critério de aceite agora cumprido nas duas metades (unitário e e2e passam em CI, não só localmente). Nota anterior do Executor (mantida como contexto): Vitest de TASK-001 reaproveitado sem alteração de config; adicionado `@playwright/test` (`playwright.config.ts`, `testDir: e2e/`, projeto `chromium`, `webServer` no servidor de dev do Vite — deliberadamente não no build de produção/PWA, para não acoplar TASK-004 ao pipeline `vite-plugin-pwa` de TASK-003 em andamento em paralelo). Mecanismo de "rede desligada + cache limpo" em `e2e/utils/offline.ts` (`clearBrowserCache`/`goOffline` via CDP `Network.clearBrowserCache`/`clearBrowserCookies` + `context.setOffline`, nessa ordem), reaproveitável pelos smoke tests offline de PWA do Lote 13 (TASK-066/067/068) e do Lote 15 (TASK-088) sem recriar a lógica. `e2e/placeholder.spec.ts`: 2 testes — shell renderiza, e cache limpo+offline efetivamente bloqueia nova navegação (prova que o mecanismo não é no-op). `playwright.config.ts`/`e2e/**/*.ts` incluídos em `tsconfig.node.json` e no script `lint`; script `test:e2e` adicionado ao `package.json` (edição cirúrgica, scripts existentes preservados). `.gitignore` recebeu `test-results/`/`playwright-report/`/`blob-report/`. Nota sobre `src/tools/dependency-rule.test.ts` (TASK-001) tratada pelo Validador como débito de severidade baixa (`REFAT-L0-01`, ver Lote Refatoração Lote-0), não como bloqueio desta tarefa — reproduzido sem carga concorrente dentro do timeout padrão. |
+| TASK-005 | Setup Supabase local + segredos de CI (nunca no bundle) | `supabase start` local funciona; teste de grep do bundle vazio ainda passa (placeholder) | — | TASK-001 | Concluída — `supabase init` + portas offset (+100: API 54421, DB 54422, Studio 54423, Inbucket 54424, pooler 54429, shadow 54420, analytics 54427, inspector 8183) para não colidir com outro projeto Supabase local já em execução; `supabase start`/`status`/`stop` validados de ponta a ponta com Docker real. Segredos de CI documentados em `docs/ci-secrets.md` + `.env.example` (nunca commitados). Teste placeholder em `tests/security/bundle-secrets.test.mjs` (detector real em `scripts/security/scan-bundle-secrets.mjs`, node:test): 3 asserções reais contra fixture sintética (prova que a lógica de detecção não é vazia) + 1 checagem contra `dist/` real, `skipped` explicitamente (motivo registrado) até a primeira tarefa de build gerar bundle de verdade — nunca um pass silencioso. `npm run test:security` |
+
+### Refatoração Lote-0
+
+> Criada pelo Validador (chapéu QA) durante o fechamento estrutural do Lote 0
+> (2026-09-07), para achado simples/débito de baixa severidade que não
+> compromete o critério de aceite central de nenhuma tarefa `Concluída` do
+> lote — ver `.md/QA-REPORT.md`, Seção 3 e Seção 5.
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com | Status |
+|---|---|---|---|---|---|
+| REFAT-L0-01 | Revisar o timeout de `src/tools/dependency-rule.test.ts` (TASK-001) — chamada real ao `dependency-cruiser` via API pode ultrapassar o timeout padrão de 5000ms do Vitest sob carga de I/O/CPU do runner; reproduzido apenas sob concorrência local de múltiplas instâncias de Executor, não reproduzido isoladamente | Rodar o teste algumas vezes no CI real (após correção de TASK-004) sob carga normal; se o tempo de execução recorrer perto do limite, aumentar o timeout do teste ou isolar a chamada do `dependency-cruiser`; senão, fechar sem alteração | TASK-004 (workflow de CI precisa estar corrigido e rodando de verdade para observar o tempo real) | — | Concluído — Validador rodou `npx vitest run` 4 vezes de forma independente durante a validação do Lote 1 (2026-09-07), nenhuma recorrência do timeout observada (durações 4.31s/4.95s/5.23s/3.93s, todas dentro do limite padrão). Fechado sem alteração de código, conforme a própria prescrição da tarefa. Ver `.md/QA-REPORT.md`, Seção "Lote 1", Seção 3 e 5. |
+
+### Lote 1 — Núcleo: Corpus e Importação
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com | Status |
+|---|---|---|---|---|---|
+| TASK-006 | `tools/corpus-import`: parser do snapshot bruto `porbr2018` → modelo canônico | Fixture gera estrutura com 66 livros | TASK-001 | TASK-010 | Concluída — parser puro em `src/tools/corpus-import/parse-snapshot.ts` (`parseSnapshot(rawContent): CanonicalCorpus`), sem snapshot real disponível no repo (dado externo, fora deste TASK.md): implementado contra fixture sintética documentando a suposição de formato no próprio arquivo (`src/tools/corpus-import/__fixtures__/porbr2018-sample.txt`, comentário de cabeçalho — linha por versículo, campos `<ID_LIVRO_USFM>\t<CAPÍTULO>\t<VERSÍCULO>\t<TEXTO>`, ids no padrão USFM/eBible.org). Cânon protestante completo (39 AT + 27 NT, ordem Gênesis...Malaquias/Mateus...Apocalipse) em `src/tools/corpus-import/canon.ts` (`CANONICAL_BOOKS`); modelo canônico (`CanonicalBook`/`CanonicalChapter`/`CanonicalVerse`, alinhado a `Book`/`Chapter`/`Verse` do SDD.md §5.3, sem `CorpusManifest` — isso é TASK-008) em `src/tools/corpus-import/types.ts`. Parser não normaliza texto (preserva byte a byte, conforme ADR-003 — normalização é problema do render), ordena por cânon (não pela ordem do snapshot bruto) e falha com `CorpusParseError` em 3 cenários defeituosos (livro do cânon ausente do snapshot, livro fora do cânon presente, linha malformada) — interface pensada para TASK-007 (verificação byte a byte) e TASK-009 (acesso tipado) consumirem sem retrabalho. Teste automatizado (`src/tools/corpus-import/parse-snapshot.test.ts`, Vitest, 8 casos) cobre diretamente o critério de aceite — roda o parser sobre a fixture real em disco e confirma exatamente 66 livros, na ordem canônica exata (índices 0/38/39/65 = Gênesis/Malaquias/Mateus/Apocalipse), split AT=39/NT=27, preservação do texto sem normalização, agrupamento/ordenação de capítulo e versículo, tolerância a linhas em branco/comentário, e os 3 cenários de falha. `npm run lint` (eslint + `lint:deps`, "no dependency violations found"), `npm run typecheck` (`tsc -b --noEmit`, sem erro) e `npx vitest run` (3 arquivos de teste, 12/12 verdes, incluindo os 8 novos) confirmados localmente após a implementação.
+| TASK-007 | `tools/corpus-import`: verificação byte a byte, falha o build (RNF-10) | Teste que corrompe 1 caractere confirma falha do pipeline | TASK-006 | — | Concluída — `verifyCorpusIntegrity(rawContent, corpus)` em `src/tools/corpus-import/verify-integrity.ts`: reconstitui, a partir do `CanonicalCorpus` (saída de `parseSnapshot`, TASK-006), as linhas `<ID_LIVRO_USFM>\t<CAPÍTULO>\t<VERSÍCULO>\t<TEXTO>` na ordem de travessia canônica, e compara byte a byte (`!==`, sem nenhuma normalização) contra as linhas significativas do `rawContent` original (mesmo critério estrutural do parser para ignorar linha em branco/comentário — o texto de cada linha não é tocado). Diverge em contagem de linhas ou em qualquer byte de uma linha → lança `CorpusIntegrityError` (interrompe o pipeline, não loga e segue silencioso); idêntico → retorna sem erro. Teste automatizado (`src/tools/corpus-import/verify-integrity.test.ts`, Vitest, 3 casos) cobre exatamente o critério de aceite: (1) snapshot íntegro não lança erro; (2) corrompe 1 único caractere do `rawContent` original (troca 1 caractere por "X" preservando o comprimento) e confirma `CorpusIntegrityError`/mensagem de divergência byte a byte; (3) truncamento (divergência de contagem de linhas) também lança. `npm run lint` (eslint + `lint:deps`, "no dependency violations found"), `npm run typecheck` (`tsc -b --noEmit`, sem erro) e `npx vitest run` (4 arquivos de teste, 15/15 verdes, incluindo os 3 novos e sem regressão nos 12 de TASK-006) confirmados localmente após a implementação. |
+| TASK-008 | `tools/corpus-import`: manifesto (`sourceVersionDate`, SHA-256, licença) | `manifest.json` validado contra schema | TASK-007 | — | Concluída — `CorpusManifest` (`sourceId`, `sourceVersionDate`, `importedAt`, `license`, `licenseUrl`, `holders`, `modifications: "none"`, `sha256`) em `src/tools/corpus-import/manifest-types.ts`. Divergência documentada do SDD.md §5.3: `sha256` é `Record<string, string>` (mapa nome-do-arquivo → hash), não `sha256[]` — permite lookup O(1) por artefato sem duplicar o nome do arquivo, mesma informação. `buildManifest(input)` em `build-manifest.ts` calcula o SHA-256 de cada artefato (`node:crypto`, `createHash("sha256")`, sem dependência nova) a partir de proveniência informada pelo chamador (`sourceId`, `sourceVersionDate`, licença, `holders`, lista de artefatos). `validateManifestSchema(value)` em `validate-manifest-schema.ts` (assertion function, sem Ajv/Zod — não estavam no `package.json`): confirma todos os campos obrigatórios presentes e tipados, `sourceVersionDate`/`importedAt` como data ISO 8601 válida, `licenseUrl` como URL válida, `modifications` como literal `"none"`, e `sha256` como mapa não vazio com valores hexadecimais de 64 caracteres; lança `ManifestSchemaError` com o campo e motivo exato em vez de retornar `false`. `src/tools/corpus-import/*.ts` (não-teste) movido do escopo de `tsconfig.app.json` (browser) para `tsconfig.node.json` (usa `node:crypto`, é script de build/CI fora do bundle de runtime — README já documentava essa intenção) — sem impacto em `core`/`features`, confirmado por `lint:deps`. Teste automatizado (`src/tools/corpus-import/build-manifest.test.ts`, Vitest, 7 casos) cobre o critério de aceite diretamente: manifesto gerado por `buildManifest` a partir da fixture de TASK-006/007 passa em `validateManifestSchema`; hash determinístico; e rejeição com motivo claro para campo obrigatório faltando, hash em formato inválido, data malformada, `sha256` vazio e `modifications` fora do literal. `npm run lint` (eslint + `lint:deps`, "no dependency violations found"), `npm run typecheck` (`tsc -b --noEmit`, sem erro) e `npx vitest run` (5 arquivos de teste, 22/22 verdes, incluindo os 7 novos e sem regressão nos 15 de TASK-006/TASK-007) confirmados localmente após a implementação. |
+| TASK-009 | `core/corpus`: acesso tipado ao corpus local (índice de livros/capítulos) | Dado o bundle, retorna capítulo por referência estruturada | TASK-008 | — | Concluída — primeiro módulo de `core/*` real do projeto (runtime do app, distinto de `tools/corpus-import`, que é código de build/CI). Tipos mínimos de runtime (`Book`/`Chapter`/`Verse`, `CorpusBundle` como array, `ChapterReference { bookId, chapter }`) em `src/core/corpus/types.ts` — deliberadamente não reimportam `CanonicalBook`/`CanonicalChapter`/`CanonicalVerse` de `src/tools/corpus-import/types.ts`: mesmo shape parecido, são camadas diferentes (build vs. runtime do navegador), e `core/*` nunca depende de `tools/*` em runtime (evita vazar Node/crypto do pipeline de build para o bundle do cliente). `getChapter(bundle, reference): Chapter \| undefined` em `src/core/corpus/get-chapter.ts`, com `buildCorpusIndex`/`getChapterFromIndex` auxiliares (`Map<bookId, Book>`) para lookup O(1) por livro em vez de O(n) por acesso; `undefined` para "não encontrado" (não exceção) — alinhado ao padrão do projeto de reservar exceção para violação de invariante/formato (`CorpusParseError`/`CorpusIntegrityError`/`ManifestSchemaError`), não para ausência esperada de referência. Barrel `src/core/corpus/index.ts` exporta a API pública do módulo. Teste automatizado (`src/core/corpus/get-chapter.test.ts`, Vitest, 5 casos) cobre diretamente o critério de aceite com bundle de fixture sintético (2 livros, GEN/EXO): retorna capítulo correto por referência estruturada (incluindo um segundo capítulo do mesmo livro e um livro diferente), `undefined` para `bookId` inexistente no bundle, `undefined` para capítulo inexistente no livro, e equivalência entre `getChapter` e o par `buildCorpusIndex`/`getChapterFromIndex`. `npm run lint` (eslint + `lint:deps` — "no dependency violations found", confirma `core/corpus` sem import de `features/*`/`tools/*`), `npm run typecheck` (`tsc -b --noEmit`, sem erro) confirmados limpos; `npx vitest run` do arquivo novo isolado 5/5 verde. Na suíte completa (`npx vitest run`), único teste vermelho é o timeout pré-existente de `src/tools/dependency-rule.test.ts` (rastreado em REFAT-L0-01, Lote Refatoração Lote-0) — reproduzido também isoladamente (sem carga concorrente de outras instâncias), portanto não é regressão desta tarefa; mantido como está, já com prazo definido ("antes do fechamento do Lote 1") e dono (Validador/REFAT-L0-01), não deste TASK-009. |
+| TASK-010 | `core/reference`: reconhecimento de referência bíblica (Resolved/Unresolved, ADR-005) | Suíte simétrica (resolve/não resolve) 100% verde | SPIKE-03, TASK-001 | TASK-006, TASK-007, TASK-008, TASK-009 | Concluída — módulo puro `src/core/reference/` (ADR-005: soma de tipos `ReferenceResolution = ResolvedReference \| UnresolvedReference`, `UnresolvedReason` fechado com os 6 motivos do ADR, `src/core/reference/types.ts`). Tabela de nomes/abreviações dos 66 livros como dado (`src/core/reference/book-names.ts`, `BOOK_NAME_TABLE`), transcrição literal da Seção 2 do `SPIKE-03-resultado.md`: `canonicalName`/`abbreviation` armazenam a forma base sem prefixo numérico, com `numberedPrefix?: "1"\|"2"\|"3"` modelando os livros numerados como entradas distintas por `bookId` (evita duplicar a lógica de prefixo em cada uma); inclui a decisão de João sem abreviação curta, Jó sem "Jo", "Salmo" como alias singular de Salmos. Normalização (`src/core/reference/normalize.ts`, `normalizeReferenceInput`): minúsculas + NFD com remoção de diacríticos (`̀`-`ͯ`) + colapso de espaços múltiplos; pontos não são removidos à parte — são o próprio separador capítulo:versículo (`Rm 8.28`), e um ponto fora dessa posição (`v. 28`) quebra a estrutura do token de livro e cai em `formato-nao-reconhecido` sem regra adicional (decisão documentada no próprio arquivo, evita contradizer o caso obrigatório `v. 28`). `resolveReference(input, bundle, table?)` em `src/core/reference/resolve-reference.ts`: parsing em 3 passos determinísticos (divide no último espaço da entrada normalizada → extrai prefixo numérico só quando inequívoco, forma espaçada sempre exige espaço explícito e a forma colada só dispara com dígito arábico literal no início, nunca letra → valida a forma estrutural do restante antes de consultar a tabela) em vez de um único regex monolítico — decisão documentada no cabeçalho do arquivo: um regex com grupo de prefixo opcional greedy `(1\|2\|3\|i\|ii\|iii)\s?` consome o "i" inicial de livros como "Isaías" sem chance de backtrack para a leitura correta, o que quebraria a forma colada `1Co 13:4` (SPIKE-03 §1) sem essa separação em etapas. Livro reconhecido na tabela mas ausente do `CorpusBundle` fornecido é tratado como `livro-desconhecido` (nunca ocorre em produção — o bundle real sempre tem os 66 livros — mas é o que torna o caso obrigatório `Jo 3:16` corretamente `livro-desconhecido` com uma fixture de teste deliberadamente parcial, decisão documentada no próprio código e no teste). Barrel `src/core/reference/index.ts`. Teste automatizado (`src/core/reference/resolve-reference.test.ts`, Vitest, 35 casos): tabela positiva cobrindo todo formato da Seção 1 do spike (livro+cap:vers, intervalo mesmo capítulo com hífen/travessão, capítulo inteiro, forma numerada arábica espaçada/colada e romana, segundo livro numerado, alias "Salmo", insensibilidade a maiúsculas/acentos) com fixture cobrindo Romanos/1 Coríntios/2 Coríntios/Gálatas/Salmos (bundle deliberadamente parcial, sem Jó/João); tabela negativa cobrindo literalmente os 10 casos obrigatórios da Seção 4 (via `it.each`, reason exato confirmado por caso); testes extras de intervalo inválido (verseStart > verseEnd, verseEnd inexistente) e de `ambiguo` via tabela de abreviações sintética injetada por parâmetro (não a tabela real de produção, conforme a nota da Seção 3 do spike — a tabela real não tem ambiguidade real nenhuma); teste dedicado confirmando que nenhuma entrada malformada lança exceção. `npm run lint` (eslint + `lint:deps`, "no dependency violations found", confirma `core/reference` sem import de `features/*`/`tools/*`, só de `core/corpus`), `npm run typecheck` (`tsc -b --noEmit`, sem erro) e `npx vitest run` (7 arquivos, 62/62 verdes, incluindo os 35 novos e sem regressão nos 27 anteriores, sem o timeout intermitente de REFAT-L0-01 desta vez) confirmados localmente após a implementação. Fecha o Lote 1 (6 de 6 tarefas concluídas). |
+| TASK-011 | Teste anti-"Almeida Atualizada/ARA/ARC" no bundle final (DI-05) | CI falha ao inserir a string de propósito | TASK-009 | — | Concluída — segue o mesmo padrão já estabelecido por TASK-005/TASK-042 (`bundle-secrets`) para strings proibidas: `scanBundleForForbiddenStrings(bundleDir)` em `scripts/security/scan-bundle-forbidden-strings.mjs` varre `dist/` (mesma lista de extensões de texto do scanner de segredos) procurando "Almeida Atualizada", "Almeida Revista e Atualizada", "ARA" e "ARC". Decisão de matching documentada no cabeçalho do próprio scanner: as duas frases longas usam comparação direta case-insensitive (risco de colisão desprezível); já "ARA"/"ARC" são siglas de 3 letras que colidiriam com substring legítima frequente em português (ARARA, ARCO, PARAR, MARCOS, ARCA) — por isso exigem borda de token (lookaround, não flanqueadas por letra incl. acentuada) E a forma exatamente maiúscula convencional da sigla bíblica (não `ara`/`arc` minúsculo, comum em outra palavra/token), sem abrir brecha real porque quem citar a tradução por nome/marca o faz na forma convencional. Teste automatizado (`tests/security/bundle-forbidden-strings.test.mjs`, `node:test`, mesmo estilo do teste irmão de segredos) com 7 casos: 4 positivos (uma fixture sintética por string proibida, confirma que o detector aciona), 2 negativos (bundle limpo comum; bundle com texto legítimo que colide por substring com as siglas — ARARA/arco-íris/arca de Noé/"Marcos"/`pararExecucao` — confirma zero falso positivo), e o teste real contra `dist/`, `skipped` explicitamente com motivo quando `dist/` não existe na sessão (nunca passa silencioso), rodando de verdade a partir do primeiro `npm run build`. Nenhum script novo no `package.json`: `test:security` (`node --test tests/security/*.test.mjs`, já existente de TASK-005) já cobre por glob qualquer teste novo em `tests/security/`, incluído este. Evidência do critério de aceite ("CI falha ao inserir a string de propósito"): após `npm run build` gerar `dist/` real, injetei manualmente a string `"Almeida Atualizada"` num arquivo do bundle publicado e rodei `node --test tests/security/bundle-forbidden-strings.test.mjs` — o teste "bundle real do cliente (dist/) não contém nenhuma string proibida por DI-05" falhou (`ERR_ASSERTION`, finding reportado com arquivo/motivo/match) e o processo saiu com exit code 1; refiz o build para restaurar `dist/` limpo e a suíte voltou a 11/11 verde. Este teste não foi adicionado ao `.github/workflows/ci.yml` nesta tarefa — mesma divisão de escopo já documentada por TASK-005 para o teste irmão de segredos (gate formal de release é TASK-091, que também consolida os demais checks de DI-05); registrando como observação, não decisão unilateral. `npm run lint` (eslint + `lint:deps`, "no dependency violations found"), `npm run typecheck` (`tsc -b --noEmit`, sem erro), `npm run build` (bundle real gerado) e `npx vitest run` (6 arquivos, 27/27 verdes, sem regressão) confirmados localmente após a implementação. |
+
+### Refatoração Lote-1
+
+> Criada pelo Validador (chapéu QA) durante o fechamento estrutural do Lote 1
+> (2026-09-07), para achado simples/débito de baixa severidade que não
+> compromete o critério de aceite central de nenhuma tarefa `Concluída` do
+> lote — ver `.md/QA-REPORT.md`, Seção "Lote 1", Seções 3 e 5.
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com | Status |
+|---|---|---|---|---|---|
+| REFAT-L1-01 | Adicionar regra `no-tools-from-core` ao `.dependency-cruiser.cjs` (mesmo padrão de `no-features-from-core`, trocando `features` por `tools`) — hoje a separação build vs. runtime entre `core/*` e `tools/*` (ADR-003, DI-02) é respeitada de fato (confirmado por leitura direta de imports), mas só é verificada mecanicamente para `core/* → features/*`, não para `core/* → tools/*` | `npm run lint:deps` falha se `core/*` importar de `tools/*`, do mesmo jeito que já falha para `features/*` | TASK-001 | — | Pendente — prazo revisado (2026-09-07) para **antes de iniciar TASK-012** (primeira tarefa de `core/content`, Lote 2), não mais "antes do fechamento do Lote 2". Revisão feita pelo Validador (chapéu DevSecOps) durante a auditoria do Lote 1: teste empírico (injeção real de `core/* → tools/corpus-import` até o entrypoint do bundle, revertida ao final) confirmou que `lint:deps` **e** `npm run build` passam limpos e o conteúdo importado aparece de fato no bundle publicado — lacuna real, não hipotética. Ver `.md/SECURITY-REVIEW.md`, seção "Lote 1", achado DEVSEC-L1-01. Não bloqueia o Lote 1 (nenhuma violação real hoje), mas a janela de risco começa no próximo código de `core/*`. |
+
+### Lote 2 — Núcleo: Conteúdo Editorial e Validação
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-012 | Tipos compartilhados: `CorpusManifest`/`Pericope`/`Note`/`PlanDay`/`Plan` | Tipos exportados e usados por importer, validador e `core/content` | TASK-001 | — |
+| TASK-013 | `tools/content-validate`: regras C1–C11 (RN-01) com veto de build | Fixture violando C3 falha o build com mensagem específica | TASK-012 | — |
+| TASK-014 | `tools/content-validate`: cobertura de RN-13 + validação de nota (120–200 palavras, autoria, revisor) | Fixture com nota fora do range falha | TASK-013 | — |
+| TASK-015 | `core/content`: loader do bundle editorial (plano, perícopes, notas, ganchos) | Dado o bundle fixture, retorna `PlanDay` por número | TASK-012 | TASK-013, TASK-014 |
+
+### Lote 3 — Núcleo: Armazenamento e Sincronização
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-016 | `core/storage`: schema Dexie versionado (stores de Fase 1) | Migração de versão testada | TASK-001 | — |
+| TASK-017 | `core/storage`: orçamento de quota + expurgo LRU (RNF-03, RT-08) | Teste de quota excedida confirma ordem de expurgo declarada | TASK-016 | TASK-018 |
+| TASK-018 | `core/sync`: outbox local (mutação com id próprio e `baseRev`) | Mutação persiste sem rede e sobrevive a reload | TASK-016 | TASK-017 |
+| TASK-019 | `core/sync`: envio em lote idempotente com gate de rede/sessão | Reenvio de lote não duplica no servidor mock | TASK-018 | — |
+| TASK-020 | `core/sync`: conciliação por entidade (união monotônica + LWW) | Dois dispositivos simulados convergem conforme a regra por entidade | TASK-019 | — |
+| TASK-021 | `core/sync`: RT-06, relógio incorreto (`received_at` além de `updated_at`) | Relógio adiantado 1 ano não corrompe LWW além do aceitável | TASK-020 | TASK-022 |
+| TASK-022 | `core/sync`: migração de progresso anônimo (RN-07) | 3 dias locais aparecem em `plan_progress` após criar conta | TASK-020 | TASK-021 |
+
+### Lote 4 — Núcleo: Design System
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-023 | Tokens de tipografia/cor/espaçamento (temas claro/escuro) + teste de contraste AA | Teste de contraste passa para todos os pares de token | TASK-001 | — |
+| TASK-024 | Tema exclusivo de apresentação (≥7:1) + teste de contraste AAA | Teste falha se qualquer par cair abaixo de 7:1 | TASK-023 | — |
+| TASK-025 | Primitivos: `Botao`, `CampoDeTexto`, `CampoDeSenha`, `SeletorDeHora`, `Alternador` | Teste de teclado e alvo de toque 44×44 em cada | TASK-023 | TASK-026 |
+| TASK-026 | Primitivos de sobreposição: `FolhaInferior`, `Dialogo`, `Toast` (base Radix) | Teste automatizado de armadilha/restauração de foco | TASK-023 | TASK-025 |
+
+### Lote 5 — Backend: Schema e Segurança
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-027 | `[insep.]` Migration `profile` + `consent` com RLS na mesma migration | Teste de política de RLS cobre as duas tabelas | TASK-005 | — |
+| TASK-028 | Migration `plan_progress` (append-only, `UNIQUE(user_id, plan_id, day_number)`) com RLS | Insert duplicado falha por constraint; RLS testada | TASK-027 | TASK-029, TASK-030, TASK-031, TASK-032 |
+| TASK-029 | Migration `preference` com RLS | RLS testada | TASK-027 | TASK-028, TASK-030, TASK-031, TASK-032 |
+| TASK-030 | `[insep.]` Migration `push_subscription` + `reminder_log` com RLS | RLS testada em ambas | TASK-027 | TASK-028, TASK-029, TASK-031, TASK-032 |
+| TASK-031 | `[insep.]` Migration `analytics_event` + `analytics_daily_aggregate` + função de incremento sem identificador com RLS | Cliente não lê o agregado; função de incremento testada | TASK-027 | TASK-028, TASK-029, TASK-030, TASK-032 |
+| TASK-032 | Migration `erasure_request` com RLS | RLS testada | TASK-027 | TASK-028, TASK-029, TASK-030, TASK-031 |
+| TASK-033 | Teste de catálogo: toda tabela com `user_id` tem RLS habilitada (RT-04) | CI falha ao adicionar tabela sem RLS de propósito | TASK-028, TASK-029, TASK-030, TASK-031, TASK-032 | — |
+| TASK-034 | Headers de segurança: CSP, HSTS, Permissions-Policy, Referrer-Policy (§7.5) | Teste de headers HTTP confirma presença de todos | TASK-005 | TASK-027 (e demais desta lote) |
+
+### Lote 6 — Identidade
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-035 | Cadastro e-mail+senha com verificação (Supabase Auth) | e2e cria conta e recebe verificação mock | TASK-027 | — |
+| TASK-036 | Tela T-08 (Criar conta) + `BlocoConsentimento` separado, desmarcado por padrão, versão do texto em `consent` | Teste de acessibilidade 3.3.2/1.3.1; grava `consent` antes de qualquer dado pessoal | TASK-035 | TASK-037, TASK-038 |
+| TASK-037 | Tela T-09 (Entrar/recuperar acesso): senha + link mágico + recuperação, sem CAPTCHA de quebra-cabeça | e2e de login, recuperação e mensagem de erro sem revelar existência do e-mail | TASK-035 | TASK-036, TASK-038 |
+| TASK-038 | Sessão: token de vida curta com refresh rotativo, sem segredo extra no dispositivo (DI-10) | `localStorage` sem dado do usuário; refresh automático testado | TASK-035 | TASK-036, TASK-037 |
+| TASK-039 | Tela T-13: exportação de dados em JSON (CA-10.4) | e2e baixa JSON com progresso/preferências/esboços | TASK-038 | TASK-040 |
+| TASK-040 | Tela T-13: fluxo de exclusão ("EXCLUIR", grava `erasure_request` com `due_at`, estado visível) | e2e cria `erasure_request` com `due_at = +15 dias` | TASK-038, TASK-032 | TASK-039 |
+
+### Lote 7 — Rotina de Exclusão
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-041 | `jobs/erasure`: execução de exclusão em cascata dentro do SLA (RN-11) | Fixture de `erasure_request` vencida confirma cascata em todas as tabelas do titular | TASK-033, TASK-040 | TASK-042 |
+| TASK-042 | Teste: credencial de serviço nunca aparece no bundle do cliente (DI-09) | Grep automatizado no bundle final falha se a chave aparecer | TASK-005 | TASK-041 |
+
+### Lote 8 — Leitura
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-043 | Tela T-04 (Índice do corpus): listas AT/NT + filtro por nome | e2e navega e filtra | TASK-009, TASK-023 | TASK-045 |
+| TASK-044 | Tela T-05 (Leitor de capítulo): numeração de versículo acessível, nota ancorada ao ponto do texto | Teste de leitor de tela (aria-label por versículo) + nota em `<aside>` | TASK-043, TASK-015 | — |
+| TASK-045 | Tela T-06 (Atribuição da licença), a partir do manifesto | e2e mostra data da versão, titulares, link CC BY 4.0; nunca contém string proibida | TASK-008, TASK-026 | TASK-043 |
+| TASK-046 | Tela T-05: estados vazio/erro (capítulo inválido; "ainda não está neste aparelho" + lista de disponíveis) | e2e simula os dois estados (C-01 UX-SPEC) | TASK-044 | — |
+
+### Lote 9 — Plano
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-047 | Tela T-01 (Vitrine): dia 1 estático, CTA "Começar meu plano", sem login | e2e renderiza sem rede (pré-renderizado) | TASK-015, TASK-023 | TASK-048 |
+| TASK-048 | Tela T-02 (Dia do plano): AT/NT + nota + "Concluir dia" fixo + constância | e2e conclui dia; rodapé fixo não cobre foco (2.4.11) | TASK-015, TASK-017 | TASK-047 |
+| TASK-049 | RN-09: cálculo do dia corrente ("o plano anda com o usuário") | Teste unitário cobre usuário que pula dias | TASK-048, TASK-020 | — |
+| TASK-050 | Tela T-03 (Dia concluído): `GanchoDeContinuidade` + `IndicadorDeConstancia`, foco no título | Teste de foco/ordem do DOM | TASK-049 | TASK-051, TASK-052 |
+| TASK-051 | Tela T-10 (Progresso e constância): faixa de 30 dias com rótulo acessível por quadrado | Teste de acessibilidade da faixa (1.4.1) | TASK-049 | TASK-050, TASK-052 |
+| TASK-052 | Tela T-14 (Conclusão do plano, dia 90): comentário opcional, dispensa permanente (CA-20.4) | e2e dispensa e confirma que não reaparece | TASK-049 | TASK-050, TASK-051 |
+| TASK-053 | T-01: variante "continue no dia N" com progresso local sem conta (L-04) | e2e usuário com progresso local vê "continue" | TASK-047, TASK-049 | — |
+
+### Lote 10 — Soft Gate e Conversão
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-054 | Tela T-07 (Convite de conta): regra de frequência (1ª conclusão, depois 1/3, nunca 2×/dia, nunca em T-20) | Teste unitário da regra com sequência de conclusões | TASK-050, TASK-035 | — |
+| TASK-055 | Integração T-07→T-08→T-03 com migração de progresso (RN-07) e recusa sem perda (CA-10.5) | e2e cobre os 3 desfechos do fluxograma §1.1 | TASK-054, TASK-036, TASK-022 | — |
+
+### Lote 11 — Engajamento e Lembrete
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-056 | `features/engagement`: assinatura Web Push (VAPID) | e2e assina e grava `push_subscription` | SPIKE-01, TASK-030, TASK-038 | — |
+| TASK-057 | `jobs/reminder`: seleção/envio de lembretes devidos + `reminder_log` | Fixture gera lembrete devido e confirma log de desfecho (CA-05.7) | TASK-056 | — |
+| TASK-058 | Tela T-12 (Lembrete e canal): prévia real do gancho, estado real do canal | e2e mostra os 3 estados de canal (§1.2) | TASK-057 | TASK-059 |
+| TASK-059 | Tela T-15 (Instalar na tela de início): variantes lembrete/púlpito, instruções por plataforma | e2e mostra texto correto por ramo de entrada | TASK-057 | TASK-058 |
+| TASK-060 | Tela T-11 (Configurações): índice completo, desativar lembrete em 2 toques (CA-05.6) | e2e conta toques até desativar = 2 | TASK-058, TASK-026 | — |
+| TASK-061 | Gancho in-app garantido nos 3 caminhos do fluxograma §1.2 | Teste unitário cobre os 3 ramos convergindo em `HOOK` | TASK-058, TASK-059 | — |
+
+### Lote 12 — Telemetria
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-062 | `features/telemetry`: fila local de eventos (`eventQueue`), inclusive pré-conta | Teste unitário enfileira evento sem conta | TASK-016 | — |
+| TASK-063 | Agregado anônimo sem sujeito, via função de incremento (M-06) | e2e sem conta gera incremento no agregado, sem linha identificável | TASK-062, TASK-031 | — |
+| TASK-064 | Migração de eventos anônimos ao consentir, preservando `occurred_at` (M-07) | Teste migra fila local com timestamp original | TASK-063, TASK-035 | — |
+| TASK-065 | Wiring de emissão de eventos nos pontos de instrumentação (D30, M-02, M-03, M-04, M-08 — RF-02/03/05/09/12/15/19/20) | Teste de integração confirma emissão de cada evento no ponto correto | TASK-064 | — |
+
+> Nota de tamanho/canário sobre TASK-065: por tocar oito pontos de instrumentação
+> diferentes já existentes (chamada de função já pronta em 062–064), o contexto de
+> trabalho previsto fica em torno de 120–180k tokens (lê 8 componentes de feature
+> já implementados + 1 módulo de telemetria) — abaixo do canário de 300k, mas é o
+> item deste documento mais próximo do teto. Se, ao chegar a hora, alguma das oito
+> features estiver marcadamente maior que o previsto no SDD.md, dividir por
+> fase/módulo (Fase 1 leitor vs. Fase 2 líder) antes de iniciar.
+
+### Lote 13 — PWA Offline (Fase 1)
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-066 | Estratégias de cache Workbox por artefato (shell/corpus/conteúdo), cache imutável + hash | e2e offline após 1ª visita navega em conteúdo já visitado | TASK-003, TASK-008 | — |
+| TASK-067 | `storage.persist()` na entrada do app, com fallback declarado | Teste confirma chamada de `persist()` e fallback quando não suportado | SPIKE-02, TASK-016 | — |
+| TASK-068 | Smoke e2e offline de Fase 1 (T-01/T-02 com rede desligada e cache limpo) | Playwright confirma T-01/T-02 funcionam a partir do cache | TASK-066, TASK-048 | — |
+
+### Lote 14 — Fase 2: Esboço (`features/outline`)
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-069 | Migration `outline` + `outline_version` (JSONB) com RLS | RLS testada; constraints de `rev` testadas | TASK-033 | — |
+| TASK-070 | `core/storage`: stores `outlines`/`outlineSnapshots`/`presentationState` (Fase 2) | `presentationState` nunca aparece na outbox | TASK-069, TASK-018 | — |
+| TASK-071 | `core/sync`: conciliação do esboço (LWW no `rev` + versão perdedora preservada 30 dias) | Edição concorrente simulada confirma versão perdedora em `outline_version` | TASK-070, TASK-020 | — |
+| TASK-072 | Tela T-16 (Entrada do Módulo 2): retomar até 4h, apresentar agora, lista curta, selo real | e2e cobre os três CTAs | TASK-071 | TASK-073 |
+| TASK-073 | Tela T-17 (Lista de esboços): ordenada por edição, menu (apresentar/duplicar/versões/excluir) | e2e cobre cada ação do menu | TASK-071 | TASK-072 |
+| TASK-074 | RF-19: duplicar esboço (copia conteúdo e estado de materialização) | Teste duplica e confirma `rev` independente | TASK-073 | — |
+| TASK-075 | Tela T-18: `BlocoDeEsboco` (4 tipos fechados, RN-12), salvamento automático, reordenação com botões ↑/↓ | e2e cria/edita/reordena e confirma persistência local automática | TASK-070, TASK-010 | — |
+| TASK-076 | `ReferenciaEmbutida`: auto-embed com nota (CA-13.2), três remoções independentes (texto/referência/nota — CA-13.5) | e2e cobre as três remoções | TASK-075, TASK-010 | — |
+| TASK-077 | `AvisoDeReferenciaNaoLida`: motivo mapeado do parser, texto do usuário intacto (CA-13.4) | Referência inválida confirma texto preservado + motivo exibido | TASK-076 | — |
+| TASK-078 | `EstadoDeSincronizacao`: "salvo no aparelho" ≠ "sincronizado" (CA-12.4) | e2e simula falha de rede e confirma rótulo correto | TASK-071, TASK-075 | — |
+| TASK-079 | Tela T-21 (Versões recuperáveis): lista, leitura somente, restaurar cria nova entrada | e2e restaura versão antiga sem destruir a atual | TASK-071, TASK-073 | — |
+
+### Lote 15 — Fase 2: Modo Apresentação (`features/presentation`)
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-080 | `SeloDeMaterializacao`: verificação real do snapshot (pronto/baixando/pendente) | Teste confirma verificação real, não valor lembrado | TASK-071 | TASK-081 |
+| TASK-081 | Provisionamento do corpus integral em segundo plano na entrada do Módulo 2 (CA-13.3) | UI responsiva durante o provisionamento (não bloqueia digitação) | TASK-070, TASK-009 | TASK-080 |
+| TASK-082 | Materialização do snapshot autocontido (blocos + versículos + notas + versões) | Apresentação não lê nenhuma outra store (RNF-01) | TASK-070, TASK-075, TASK-076 | — |
+| TASK-083 | Tela T-19 (Preparo para apresentar): checklist, barra "X de Y cartões", "Apresentar assim mesmo"/"Esperar terminar" | e2e cobre os 3 estados (pronto/baixando/pendente) | TASK-080, TASK-081, TASK-082 | — |
+| TASK-084 | Tela T-20: `CartaoDeApresentacao` + navegação (toque/arrastar/teclado/Page Up-Down), zonas 40/20/40 | e2e navega por todos os métodos | TASK-082, TASK-083 | — |
+| TASK-085 | Tela T-20: fila de interrupções suspensa + Screen Wake Lock + saída sem confirmação | e2e confirma nenhuma interrupção visível durante a rota; wake lock ativo/liberado | SPIKE-04, TASK-084 | — |
+| TASK-086 | RN-14: retomada de estado (`presentationState`, índice gravado a cada navegação) | Recarga simulada confirma retomada no mesmo cartão | TASK-084 | TASK-087 |
+| TASK-087 | RT-11: envelhecimento do snapshot (diferença de versão registrada ao abrir) | Snapshot antigo confirma diferença registrada e rematerialização com rede | TASK-082, TASK-084 | TASK-086 |
+| TASK-088 | Teste e2e crítico RNF-01: primeiro cartão ≤1s, rede desligada, caches limpos (M-04) | Playwright confirma tempo ≤1s e zero requisições de rede | TASK-084, TASK-085 | — |
+
+### Lote 16 — QA Transversal (Acessibilidade, Responsividade, Segurança Final)
+
+| ID | Tarefa | Critério de aceite | Depende de | Paralelizável-com |
+|---|---|---|---|---|
+| TASK-089 | Suíte de acessibilidade automatizada (axe/Playwright) — as 21 telas | Suíte roda em CI e falha em qualquer violação crítica | Todas as telas de Fase 1 e Fase 2 | TASK-090, TASK-091 |
+| TASK-090 | Testes de responsividade (600px/900px) — telas de layout variável | Snapshots/Playwright confirmam os três layouts em cada tela listada em UX-SPEC §6 | Todas as telas de Fase 1 e Fase 2 | TASK-089, TASK-091 |
+| TASK-091 | Consolidação final: headers de segurança + strings proibidas + credencial fora do bundle | CI de release confirma os três checks simultaneamente | TASK-034, TASK-011, TASK-042 | TASK-089, TASK-090 |
+
+> Nota de canário sobre TASK-089/090: ambas dependem "de todas as telas prontas",
+> o que é uma dependência ampla por natureza (gate de QA, não uma tela nova). O
+> contexto de trabalho real por execução é pequeno (a suíte roda contra o app já
+> construído, não relê a decisão de cada tela) — mas a **dependência de
+> sequenciamento** é ampla: só disparar depois que os Lotes 6, 8, 9, 10, 11, 14 e
+> 15 estiverem `Concluído`.
+
+---
+
+## 5. Riscos de Prazo
+
+| # | Risco | Lote afetado | Mitigação |
+|---|---|---|---|
+| RP-01 | SPIKE-03 (parser de referência) atrasar por ambiguidade real maior que a esperada | Lote 1 e todo o Módulo 2 (Lotes 14–15 dependem de TASK-010) | Rodar SPIKE-03 o mais cedo possível, em paralelo ao Lote 0; se ultrapassar 2 dias sem convergir, escalar ao Coordenador via `BLOCKERS.md` antes de estimar TASK-010 com confiança |
+| RP-02 | RT-03 do SDD.md (acervo editorial não pronto): TASK-013/014/015 e todo o Lote 9 (Plano) ficam bloqueados por conteúdo, não por código | Lote 2, Lote 9 | Fixtures de conteúdo sintético permitem implementar e testar sem esperar o acervo real; troca de fixture por acervo real é tarefa de configuração, não de código |
+| RP-03 | TASK-065 (wiring de telemetria) e TASK-089/090 (QA transversal) são os itens de maior superfície de dependência do documento — atraso em qualquer tela de Fase 1 atrasa esses fechamentos | Lote 12, Lote 16 | Não são bloqueantes de lote anterior: podem começar parcialmente (por feature já `Concluída`) em vez de esperar o fechamento total |
+| RP-04 | RT-01/RT-02 (expurgo de storage no iOS; cobertura desigual de push) são riscos de produto, não só de prazo — SPIKE-01/SPIKE-02 podem revelar que a mitigação de arquitetura não é suficiente | Lote 11, Lote 13, Lote 15 | Se o spike confirmar severidade maior que a prevista no SDD.md §6.1, é lacuna estrutural — sinalizar ao Coordenador/Gestor, não decidir sozinho um novo desenho |
+| RP-05 | Backend (Lote 5) é pré-requisito de praticamente todo o resto do documento — qualquer atraso nele se propaga para Identidade, Engajamento, Telemetria e Exclusão | Lote 5 | Priorizar TASK-027 (bootstrap) no primeiro dia útil de implementação; as 5 migrations paralelizáveis (028–032) podem ser divididas entre múltiplas instâncias do Executor no mesmo lote |
+
+## 6. Lacunas Sinalizadas
+
+| # | Lacuna | Tratamento nesta decomposição | Precisa de decisão? |
+|---|---|---|---|
+| LS-01 | L-01 do UX-SPEC.md (insumo de 5 notas-exemplo do stakeholder não existe) | TASK-014/TASK-036/TASK-044 usam a definição normativa de RN-04/RN-13 e fixtures sintéticas; se as notas reais revelarem estrutura interna (subtítulos, listas, citação), `NotaDeContexto` (TASK-044) precisa de tarefa de revisão adicional, não coberta aqui | Sim — insumo do stakeholder, sinalizado ao Gestor |
+| LS-02 | Grupamentos `[insep.]` do Lote 5 (TASK-027, TASK-030, TASK-031) juntam duas tabelas numa única migration | Justificativa: `profile`+`consent` são o bootstrap mínimo de identidade (uma não existe sem a outra no primeiro commit); `push_subscription`+`reminder_log` são o bootstrap mínimo de engajamento; `analytics_event`+`analytics_daily_aggregate` são ligadas pela mesma função de incremento privilegiada — separar criaria uma migration que não compila isolada | Não — decisão de detalhe, documentada aqui |
+| LS-03 | Nenhuma lacuna estrutural do SDD.md ou do UX-SPEC.md foi encontrada durante a decomposição — a arquitetura e a experiência já resolveram os 10 conflitos (C-01 a C-10) e as 6 lacunas de detalhe (L-02 a L-06) do UX-SPEC.md §7 antes desta rodada | Nenhuma ação adicional necessária | Não |
+| LS-04 | O canário de ~300k tokens: nenhuma tarefa deste documento excede a estimativa de contexto necessário, exceto a nota explícita em TASK-065 (Seção 4) — nenhuma outra tarefa toca mais de 2–3 arquivos/módulos existentes simultaneamente | Autocheck já aplicado tarefa a tarefa durante a decomposição (divisões como TASK-084/085/086/087/088 dentro do modo apresentação, e TASK-027–034 no schema, resultaram diretamente desse autocheck: a primeira tentativa de desenhar "Modo apresentação" como 2 tarefas e "Schema" como 3 migrations agrupadas foi descartada por ultrapassar o tamanho-alvo de 1 dia-pessoa e a regra de não-mistura de SQL) | Não |
+
+---
+
+## Resumo de Rastreabilidade
+
+- **91 tarefas de implementação** (TASK-001 a TASK-091) + **4 spikes técnicos**
+  (SPIKE-01 a SPIKE-04), organizadas em **17 lotes** (Lote 0 a Lote 16).
+- Todo componente da Seção 2.2 do `SDD.md` tem ao menos uma tarefa; toda tela da
+  Seção 1.0 do `UX-SPEC.md` (T-01 a T-21) tem ao menos uma tarefa própria; toda
+  tabela da Seção 5.3 do `SDD.md` tem migration própria (ou par inseparável
+  documentado); todo ADR tem ao menos uma tarefa que o implementa ou verifica.
+- Fase 1 = Lotes 0–13 (79 tarefas); Fase 2 = Lotes 14–15 (20 tarefas); Lote 16 é
+  transversal às duas fases.

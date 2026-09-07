@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "types": ["node"]
+  },
+  "include": [
+    "vite.config.ts",
+    "playwright.config.ts",
+    ".dependency-cruiser.cjs",
+    "tools/**/*.ts",
+    "src/tools/corpus-import/**/*.ts",
+    "src/**/__tests__/**/*.ts",
+    "src/**/*.test.ts",
+    "e2e/**/*.ts"
+  ]
+}

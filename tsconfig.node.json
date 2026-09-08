@@ -18,6 +18,7 @@
     ".dependency-cruiser.cjs",
     "tools/**/*.ts",
     "src/tools/corpus-import/**/*.ts",
+    "src/design-tokens/parse-tokens-css.ts",
     "src/**/__tests__/**/*.ts",
     "src/**/*.test.ts",
     "e2e/**/*.ts"

@@ -43,6 +43,7 @@ describe("AppDatabase — schema Dexie versionado (TASK-016)", () => {
     expect(storeNames).toEqual(
       [
         "anonProgress",
+        "authSession",
         "contentBundle",
         "corpusBundle",
         "corpusChapters",
@@ -101,6 +102,11 @@ describe("AppDatabase — schema Dexie versionado (TASK-016)", () => {
       payload: {},
       occurredAt: new Date().toISOString(),
     });
+    await db.authSession.put({
+      key: "supabase.auth.token",
+      value: JSON.stringify({ access_token: "at", refresh_token: "rt" }),
+      updatedAt: new Date().toISOString(),
+    });
 
     expect(await db.corpusChapters.get({ bookId: "GEN", chapter: 1 })).toBeDefined();
     expect(await db.corpusBundle.get("default")).toBeDefined();
@@ -110,6 +116,7 @@ describe("AppDatabase — schema Dexie versionado (TASK-016)", () => {
     expect(await db.preferences.get("theme")).toBeDefined();
     expect(await db.outbox.get("mutation-1")).toBeDefined();
     expect(await db.eventQueue.get(eventId)).toBeDefined();
+    expect(await db.authSession.get("supabase.auth.token")).toBeDefined();
 
     db.close();
   });
@@ -156,7 +163,11 @@ describe("AppDatabase — schema Dexie versionado (TASK-016)", () => {
     const dbV2 = open(dbName);
     await dbV2.open();
 
-    expect(dbV2.verno).toBe(2);
+    // TASK-038 (v3, `authSession`) adiciona uma store nova sem migrar dado
+    // pré-existente — não invalida esta migração real v1 → v2, só desloca o
+    // número de versão final esperado depois que o schema real de produção
+    // (v1 + v2 + v3) é aplicado sobre o banco.
+    expect(dbV2.verno).toBe(3);
 
     const migrated = await dbV2.outbox.get("pending-mutation-1");
     expect(migrated).toBeDefined();

@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from "dexie";
 
 import type {
   AnonProgressRecord,
+  AuthSessionRecord,
   ContentBundleRecord,
   CorpusBundleRecord,
   CorpusChapterRecord,
@@ -28,6 +29,11 @@ import type {
  *   por ordem de criação"). A função `upgrade` back-preenche `retryCount: 0`
  *   em toda mutação já existente na outbox, para que a migração nunca perca
  *   nem invalide dado pendente de sincronização real do usuário.
+ * - v3: adiciona `authSession` (TASK-038, DI-10/G-11) — store genérica
+ *   chave/valor usada pelo adaptador de storage do cliente Supabase Auth
+ *   (`features/identity/dexie-auth-storage.ts`), para que o token de sessão
+ *   nunca seja persistido em `localStorage`. Store nova, sem dado prévio a
+ *   migrar — não precisa de função `upgrade`.
  */
 export class AppDatabase extends Dexie {
   corpusChapters!: EntityTable<CorpusChapterRecord, "bookId" | "chapter">;
@@ -38,6 +44,7 @@ export class AppDatabase extends Dexie {
   preferences!: EntityTable<PreferenceRecord, "key">;
   outbox!: EntityTable<OutboxRecord, "id">;
   eventQueue!: EntityTable<EventQueueRecord, "id">;
+  authSession!: EntityTable<AuthSessionRecord, "key">;
 
   constructor(name = "estudobiblico") {
     super(name);
@@ -68,6 +75,10 @@ export class AppDatabase extends Dexie {
             }
           });
       });
+
+    this.version(3).stores({
+      authSession: "key, updatedAt",
+    });
   }
 }
 

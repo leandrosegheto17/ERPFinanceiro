@@ -94,3 +94,20 @@ export interface EventQueueRecord {
   readonly occurredAt: string;
   readonly sentAt?: string;
 }
+
+/**
+ * `authSession` — armazenamento chave/valor genérico (string) usado pelo
+ * adaptador de storage do cliente Supabase Auth (TASK-038, `features/identity`,
+ * DI-10/G-11): o SDK do Supabase, por padrão, persiste a sessão de
+ * autenticação (`access_token`/`refresh_token`) em `localStorage`; esta store
+ * existe para que essa persistência aconteça em IndexedDB (Dexie) em vez
+ * disso — nunca em `localStorage` — mesma camada usada para todo o resto do
+ * conteúdo do usuário. `key`/`value` são deliberadamente opacos (o formato
+ * interno é definido pelo Supabase Auth, não por este schema) — este módulo
+ * (`core/storage`) só provê o meio de persistência, sem conhecer o conteúdo.
+ */
+export interface AuthSessionRecord {
+  readonly key: string;
+  readonly value: string;
+  readonly updatedAt: string;
+}

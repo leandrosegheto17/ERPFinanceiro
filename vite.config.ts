@@ -1,10 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import { securityHeadersPlugin } from "./src/tools/security/vitePluginSecurityHeaders.ts";
 
 export default defineConfig({
   plugins: [
     react(),
+    // TASK-034 (Lote 5): CSP/HSTS/Permissions-Policy/Referrer-Policy (SDD
+    // §7.5). Aplica em dev/preview (middleware) e escreve `_headers`
+    // (Cloudflare Pages) no build — ver src/tools/security/securityHeaders.ts.
+    securityHeadersPlugin(),
     // TASK-003 (Lote 0): shell básico instalável. Estratégias de cache por
     // artefato (shell/corpus/conteúdo) ficam para TASK-066 (Lote 13) — aqui só
     // o essencial para instalação local e manifest válido (DI-15).

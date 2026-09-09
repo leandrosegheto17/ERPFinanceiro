@@ -1,0 +1,48 @@
+/* TASK-025 — estilo do primitivo `SeletorDeHora` (UX-SPEC §3.2). */
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.rotulo {
+  font-family: var(--font-family-base);
+  font-size: var(--fs-apoio);
+  line-height: var(--lh-apoio);
+  color: var(--color-text);
+}
+
+.input {
+  font-family: var(--font-family-base);
+  font-size: var(--fs-corpo);
+  line-height: var(--lh-corpo);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  width: fit-content;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
+.erro {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--fs-apoio);
+  color: var(--color-danger);
+  margin: 0;
+}
+
+.erroIcone {
+  flex-shrink: 0;
+}

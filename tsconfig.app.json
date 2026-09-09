@@ -22,7 +22,6 @@
   "include": ["src"],
   "exclude": [
     "src/**/*.test.ts",
-    "src/**/*.test.tsx",
     "src/tools/corpus-import/**/*.ts",
     "src/design-tokens/parse-tokens-css.ts"
   ]

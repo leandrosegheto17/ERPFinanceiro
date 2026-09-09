@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
@@ -10,6 +10,7 @@
     "moduleDetection": "force",
     "noEmit": true,
     "strict": true,
+    "jsx": "react-jsx",
     "types": ["node"]
   },
   "include": [
@@ -21,6 +22,8 @@
     "src/design-tokens/parse-tokens-css.ts",
     "src/**/__tests__/**/*.ts",
     "src/**/*.test.ts",
-    "e2e/**/*.ts"
+    "e2e/**/*.ts",
+    "e2e/**/*.tsx",
+    "src/vite-env.d.ts"
   ]
 }

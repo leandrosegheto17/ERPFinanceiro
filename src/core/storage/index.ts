@@ -1,6 +1,7 @@
 export { AppDatabase, createAppDatabase } from "./db";
 export type {
   AnonProgressRecord,
+  AuthSessionRecord,
   ContentBundleRecord,
   CorpusBundleRecord,
   CorpusChapterRecord,

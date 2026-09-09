@@ -223,7 +223,11 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# TASK-035 (Lote 6 — Identidade): ligado — SDD.md §7.1 exige "e-mail + senha
+# com verificação de e-mail". Local: capturado pelo Inbucket/Mailpit deste
+# projeto (porta 54424, ver INBUCKET_URL/MAILPIT_URL de `supabase status`),
+# nunca envio real ("verificação mock" do critério de aceite).
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.

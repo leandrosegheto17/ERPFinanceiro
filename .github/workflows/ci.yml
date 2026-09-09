@@ -36,11 +36,36 @@ jobs:
       - name: Unit tests
         run: npm run test
 
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local (Docker) and apply migrations
+        run: supabase start
+
+      - name: DB tests (RLS, incl. gate de catálogo RT-04 — TASK-033)
+        run: npm run test:db
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:54422/postgres
+          SUPABASE_URL: http://127.0.0.1:54421
+          SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+
       - name: Build
         run: npm run build
 
       - name: Install Playwright browsers (Chromium)
         run: npx playwright install --with-deps chromium
 
+      # TASK-035 (Lote 6 — Identidade): e2e/identity-signup.spec.ts precisa do
+      # Supabase local de pé (Auth + Mailpit/Inbucket) — por isso "Stop
+      # Supabase local" (abaixo) só roda depois deste step, não mais logo após
+      # os testes de banco. `SUPABASE_URL`/chaves usam o mesmo default do
+      # Supabase local documentado em docs/ci-secrets.md §3 (fallback do
+      # próprio teste quando a env var não é passada).
       - name: E2E tests
         run: npm run test:e2e
+
+      - name: Stop Supabase local
+        if: always()
+        run: supabase stop

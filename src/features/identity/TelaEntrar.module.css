@@ -1,0 +1,46 @@
+/**
+ * TASK-037 — T-09 (Entrar/recuperar acesso). Coluna única centralizada,
+ * largura máxima 30rem (UX-SPEC §6, linha de T-03/T-06/T-08/T-09/...).
+ */
+.tela {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 30rem;
+  margin-inline: auto;
+  padding: 1.5rem 1rem;
+}
+
+.titulo {
+  margin: 0;
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.alternativas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.linkComoBotao {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-link, #1d4ed8);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  min-height: var(--touch-target-min);
+}
+
+.mensagemSucesso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}

@@ -5,17 +5,21 @@ Sequência lógica da **fase de execução** — parte de onde o planejamento te
 pelo Gestor, ver `PLANNING-FLOW.md`) e vai até o deploy em produção, fechando o
 ciclo de volta ao Gestor.
 
-Este documento cobre a lógica dos **três comandos** da fase de execução —
-`/executar` (Executor implementa), `/validar` (Validador audita um lote fechado) e
-`/deploy` (Validador publica) — e do comando somente-leitura `/listar`. Nenhum dos
-três dispara o próximo automaticamente: **o usuário é o orquestrador**, decide
-quando rodar cada um. **Exceção documentada**: `/executar --continuar` passa a
-rodar a validação (Comando 2) de cada lote automaticamente assim que ele fecha,
-antes de seguir para o próximo — ver Comando 1, Seção 3. Fora disso, o comando
-seguinte continua sendo decisão do usuário. Este documento não redefine os agentes
-consolidados (`.claude/agents/gestor.md`, `coordenador.md`, `executor.md`,
-`validador.md`) nem a convenção de artefatos (`PIPELINE-CONVENTIONS.md`) — só
-ordena o que cada um já declara, em nível de comando.
+Este documento cobre a lógica dos **comandos** da fase de execução —
+`/executar` (Executor implementa por lote), `/executar_tarefa` (versão de escopo
+mínimo: uma única tarefa por vez, com validação leve), `/validar` (Validador
+audita um lote fechado) e `/deploy` (Validador publica) — e do comando
+somente-leitura `/listar`. Nenhum deles dispara o próximo automaticamente: **o
+usuário é o orquestrador**, decide quando rodar cada um. **Exceção documentada**:
+`/executar --continuar` passa a rodar a validação (Comando 2) de cada lote
+automaticamente assim que ele fecha, antes de seguir para o próximo — ver Comando
+1, Seção 3. `/executar_tarefa` nunca encadeia (ver Comando 1b) — mesmo assim,
+não substitui o `/validar` completo por lote, só uma checagem de critério de
+aceite da tarefa isolada. Fora disso, o comando seguinte continua sendo decisão do
+usuário. Este documento não redefine os agentes consolidados
+(`.claude/agents/gestor.md`, `coordenador.md`, `executor.md`, `validador.md`) nem
+a convenção de artefatos (`PIPELINE-CONVENTIONS.md`) — só ordena o que cada um já
+declara, em nível de comando.
 
 > Modelo anterior (12 agentes, um único `/executar` que fazia implementação + QA +
 > DevSecOps + DevOps encadeados por lote) descontinuado — ver nota no topo de
@@ -163,6 +167,57 @@ mesmo dispatch de preparação de infraestrutura do chapéu DevOps (Comando 3, S
 1) — sem esperar a primeira chamada de `/deploy`. Isso não pausa nem bloqueia o
 `/executar`, é só aproveitar a sessão longa para adiantar trabalho que já é
 declarado como paralelo à implementação em `validador.md`.
+
+---
+
+## Comando 1b: `/executar_tarefa` — Executor, uma única tarefa (+ validação leve)
+
+| Dispara quando | Agente | Ação | Pausa obrigatória |
+|---|---|---|---|
+| Usuário roda `/executar_tarefa` (sem argumento) | `executor` (uma única instância, para a primeira tarefa elegível de todo o `TASK.md`); `validador` (validação leve, só `acceptance-criteria-validation`, escopada à tarefa) | Implementa a tarefa, revisão inline, valida só o critério de aceite dela, atualiza Status | Sempre, ao fim da tarefa (execução + validação leve) — nunca encadeia; bloqueio Aberto com prioridade; reprovação da revisão inline após 2 tentativas; reprovação da validação leve |
+
+Versão de **escopo mínimo** do Comando 1, pensada para não poluir o contexto:
+processa **uma tarefa por chamada**, nunca um lote inteiro, e sempre para ao
+final — não tem modo `--continuar`. Útil quando o usuário quer avançar a fila aos
+poucos, sob controle manual, em vez de disparar todas as tarefas elegíveis de um
+lote em paralelo.
+
+### 1. Determinar o item-alvo (tarefa ou bloqueio)
+
+1. Leia `.md/BLOCKERS.md` primeiro. Uma entrada `Aberto` que afete a primeira
+   tarefa elegível **tem prioridade sobre executar**: pare e apresente a entrada —
+   nunca pule para outra tarefa não afetada nesta chamada.
+2. Sem bloqueio com prioridade: ache a **primeira** tarefa `Pendente`/`Em
+   andamento` de toda a Seção 3 do `TASK.md` (não só de um lote) cujas
+   dependências internas (Seção 4) já estejam resolvidas. Essa é a única
+   tarefa-alvo da chamada.
+3. Nenhuma tarefa elegível em todo o `TASK.md`: informe e pare.
+
+### 2. Execução + revisão inline
+
+Igual ao Comando 1, Seção "2. Rodada paralela", itens 3-4, mas para uma única
+tarefa (sem rodada, sem recalcular fila): dispare `executor`
+(`run_in_background: false`), confira o canário de contexto
+(`subagent_tokens` > ~300 mil trata como desvio grande de escopo, pausa
+imediata), rode a revisão inline (spec-compliance + `code-review`) contra o
+`git diff` da tarefa, fix-loop de até 2 tentativas. 3ª falha, desvio de escopo, ou
+lacuna no `UX-SPEC.md`/`SDD.md`: **pare** (`Bloqueada` + `BLOCKERS.md`). Passou
+limpo: marque `Concluída`.
+
+### 3. Validação leve (não é o `/validar` de lote)
+
+Dispare `validador` rodando **só** `acceptance-criteria-validation` contra o
+critério de aceite desta tarefa — sem `cross-platform-integration-testing`, sem
+chapéu DevSecOps, sem checagem estrutural de lote (essas continuam exclusivas do
+Comando 2, quando o lote inteiro fechar). Reprovação (crítica ou simples): pare e
+reporte, sem criar `Refatoração Lote-X` aqui — isso é decisão de lote, do Comando
+2. Aprovado: tarefa confirmada.
+
+### 4. Encerramento
+
+Sempre pare aqui, mesmo limpo — não dispara `/validar` de lote nem `/deploy`, não
+processa outra tarefa. Quando todas as tarefas do lote fecharem `Concluída`, o
+`/validar` completo (Comando 2) segue sendo o gate de fechamento de lote.
 
 ---
 

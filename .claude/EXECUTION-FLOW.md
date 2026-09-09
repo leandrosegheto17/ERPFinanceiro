@@ -8,8 +8,10 @@ ciclo de volta ao Gestor.
 Este documento cobre a lógica dos **comandos** da fase de execução —
 `/executar` (Executor implementa por lote), `/executar_tarefa` (versão de escopo
 mínimo: uma única tarefa por vez, com validação leve), `/validar` (Validador
-audita um lote fechado) e `/deploy` (Validador publica) — e do comando
-somente-leitura `/listar`. Nenhum deles dispara o próximo automaticamente: **o
+audita um lote fechado) e `/deploy` (Validador publica) — e dos comandos
+somente-leitura `/listar` (projeto inteiro, por lote) e `/listar_tarefa` (só as 3
+próximas tarefas elegíveis da fila). Nenhum deles dispara o próximo
+automaticamente: **o
 usuário é o orquestrador**, decide quando rodar cada um. **Exceção documentada**:
 `/executar --continuar` passa a rodar a validação (Comando 2) de cada lote
 automaticamente assim que ele fecha, antes de seguir para o próximo — ver Comando
@@ -409,6 +411,27 @@ estrutural, tudo resolvido pelo próprio Validador salvo escalação real ao
 Coordenador), e "publicado" passa a ser rastreado via
 `DEPLOY.md` produzido pelo comando 3. Não dispara nenhum agente, não avança
 tarefa, não sugere próximo comando.
+
+---
+
+## Comando 4b: `/listar_tarefa` — somente leitura, escopo de tarefa
+
+Versão de escopo mínimo do Comando 4: em vez do projeto inteiro agrupado por
+lote, mostra só as **3 próximas tarefas elegíveis** da fila — o mesmo recorte que
+`/executar_tarefa` (Comando 1b) consumiria uma chamada de cada vez.
+
+1. Percorra a Seção 3 do `TASK.md` na ordem do documento (não agrupe por lote) e
+   monte a fila de tarefas elegíveis: `Pendente`/`Em andamento` com dependências
+   internas (Seção 4) já resolvidas — mesmo critério do item 1 do Comando 1b.
+2. Verifique `BLOCKERS.md` para entradas `Aberto` afetando alguma dessas tarefas,
+   sobretudo a primeira — é ela que faria `/executar_tarefa` parar sem executar
+   nada na próxima chamada.
+3. Apresente as até 3 primeiras tarefas da fila (nome/id, lote, chapéu
+   responsável, critério de aceite resumido, status), destacando no topo
+   qualquer bloqueio `Aberto` afetando a primeira. Menos de 3 tarefas elegíveis
+   não é erro — reporte quantas restam.
+
+Não dispara nenhum agente, não avança tarefa, não sugere próximo comando.
 
 ---
 

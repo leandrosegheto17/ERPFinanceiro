@@ -33,6 +33,35 @@ declara, em nível de comando.
 `/executar` rodar de verdade — a revisão inline pós-tarefa (ver comando 1) depende
 de `git diff`.
 
+**Isolamento por worktree (obrigatório, primeiro passo da Seção 0 de cada
+comando)**: cada chamada de um comando de execução (`/executar`,
+`/executar_tarefa`, `/validar`, `/deploy`) roda numa worktree git dedicada à
+sessão, nunca direto na árvore principal — isso evita que duas sessões rodando
+comandos de execução ao mesmo tempo pisem uma na outra (edição concorrente de
+`TASK.md`, `BLOCKERS.md`, código).
+
+1. Garanta/entre numa worktree dedicada a esta sessão (skill
+   `superpowers:using-git-worktrees` ou tool `EnterWorktree`) antes de ler ou
+   escrever qualquer artefato — nome sugerido: `execucao/<comando>-<lote-ou-
+   tarefa>`. Se esta sessão já estiver numa worktree aberta para o mesmo
+   lote/tarefa (chamada anterior ainda em andamento), reaproveite-a — não crie
+   outra.
+2. Todo agente disparado dentro da chamada (`executor`, `validador`) herda essa
+   mesma worktree — nunca disperse instâncias paralelas da mesma rodada em
+   worktrees diferentes (ver "Unidade de trabalho: o lote" abaixo — todas as
+   tarefas de um lote precisam ver o mesmo `git diff`).
+3. **Encerramento limpo** (fim de lote/tarefa, lote validado, ou publicação, sem
+   bloqueio pendente): antes de apresentar o resumo final, integre a worktree de
+   volta ao branch principal (merge/rebase) e remova a worktree (`ExitWorktree`
+   ou equivalente). Esse merge é o que torna `TASK.md`/`BLOCKERS.md`/
+   `DEPLOY.md` atualizados visíveis para `/listar`, `/listar_tarefa` e para a
+   próxima chamada de qualquer comando — inclusive de outra sessão.
+4. **Encerramento por bloqueio** (tarefa `Bloqueada`, achado crítico, etc.):
+   **não integre** a worktree — deixe-a como está para inspeção, e informe o
+   caminho dela no resumo de bloqueio (Seção "Bloqueio e escalonamento" abaixo).
+5. `/listar` e `/listar_tarefa` são somente-leitura e não escrevem nada — podem
+   ler direto da árvore principal, sem precisar de worktree própria.
+
 ---
 
 ## Unidade de trabalho: o lote

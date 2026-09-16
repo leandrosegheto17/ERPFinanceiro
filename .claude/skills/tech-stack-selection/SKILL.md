@@ -50,6 +50,11 @@ infraestrutura):
    reverter, ou um componente crítico "comprado" em vez de construído, isso não se
    decide sozinho aqui — vira ADR marcado para revisão de `build-vs-buy-analysis` no
    Gate 2 do CTO.
+5. **Ambiente de execução local.** Convenção fixa deste ambiente: todo projeto sobe
+   com `docker-compose.yml` na raiz, orquestrando `backend/`, `frontend/` e qualquer
+   banco/serviço de apoio, desde o início do projeto — não como item adiado para o
+   fim. Isso elimina divergência de ambiente entre máquinas e permite que o
+   Validador teste em condição equivalente à de produção.
 
 ## Workflow
 
@@ -60,7 +65,10 @@ infraestrutura):
    vez de decidir sozinho.
 4. Toda escolha de stack relevante vira um ADR (via `adr-drafting`) — esta skill
    produz o conteúdo, `adr-drafting` formaliza o registro.
-5. Escreva a Seção 3 do `SDD.md` (Stack Tecnológica e Justificativa).
+5. Defina a composição do `docker-compose.yml` (serviços `backend`, `frontend`,
+   banco/serviços de apoio) coerente com a stack escolhida.
+6. Escreva a Seção 3 do `SDD.md` (Stack Tecnológica e Justificativa), incluindo o
+   ambiente de execução local via Docker Compose.
 
 ## Output Esperado
 
@@ -78,6 +86,8 @@ infraestrutura):
       `build-vs-buy-analysis` no Gate 2, não decidida sozinho
 - [ ] Toda escolha de stack relevante tem (ou está marcada para receber) um ADR
       correspondente
+- [ ] `docker-compose.yml` definido cobrindo `backend`, `frontend` e serviços de
+      apoio (banco, etc.), registrado na Seção 3 do SDD.md
 
 ### MUST DO
 - Nomear a alternativa real preterida, não uma alternativa de palha fácil de

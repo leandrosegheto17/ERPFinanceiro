@@ -49,6 +49,11 @@ Sem o PRD-TECNICO.md liberado, esta skill não roda — ver guardrail do agente
    complexidade e equipe, não ser um padrão aplicado por hábito.
 5. **Integrações externas.** Todo item da Seção 5 do PRD-TECNICO.md (Integrações
    Externas) precisa aparecer como uma fronteira explícita na arquitetura.
+6. **Estrutura de pastas do projeto.** Convenção fixa deste ambiente: todo projeto
+   nasce organizado em duas pastas de topo, `backend/` e `frontend/`, separando
+   claramente API/lógica de servidor da interface — independente do padrão
+   arquitetural escolhido no item 4. Essa convenção deve ser registrada
+   explicitamente no `SDD.md`, não assumida implicitamente.
 
 ## Workflow
 
@@ -61,7 +66,8 @@ Sem o PRD-TECNICO.md liberado, esta skill não roda — ver guardrail do agente
 4. Escolha e justifique o padrão arquitetural geral.
 5. Renderize o diagrama de componentes e de fluxo de dados com `mermaid-studio`.
 6. Escreva as Seções 1-2 do `SDD.md` (Visão Geral da Arquitetura, Componentes e Fluxo
-   de Dados).
+   de Dados), incluindo a convenção de pastas `backend/` e `frontend/` na raiz do
+   projeto.
 
 ## Output Esperado
 
@@ -78,6 +84,8 @@ Sem o PRD-TECNICO.md liberado, esta skill não roda — ver guardrail do agente
 - [ ] Padrão arquitetural escolhido tem justificativa ligada a volume/complexidade/
       equipe, não aplicado por hábito
 - [ ] Diagrama de componentes e de fluxo de dados renderizado e embutido na Seção 2
+- [ ] Convenção de pastas `backend/` e `frontend/` na raiz registrada explicitamente
+      no SDD.md
 
 ### MUST DO
 - Rastrear cada componente de volta a um requisito real do PRD-TECNICO.md.

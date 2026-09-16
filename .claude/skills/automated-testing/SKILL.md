@@ -58,6 +58,11 @@ Do NOT use for:
 4. **Caso de exceção testado.** Todo caso de exceção coberto pela implementação
    (erro de negócio no Backend, estado de erro de tela no Frontend/Mobile) tem
    teste correspondente, não só o caminho feliz.
+5. **Cobertura mínima como gate estrutural.** Convenção fixa deste ambiente: regra
+   de negócio (Backend) e lógica de componente/tela (Frontend/Mobile) mantêm no
+   mínimo 70-80% de cobertura de linha/branch, medida por ferramenta do próprio
+   framework de teste. Abaixo do mínimo, a tarefa não é candidata a `Concluída`
+   independente de o critério de aceite formal já estar coberto.
 
 ## Workflow
 
@@ -67,8 +72,9 @@ Do NOT use for:
 3. Escreva teste de integração (Backend), de componente/interação (Frontend) ou de
    interface (Mobile, nas plataformas em que a lógica difere) para todo caminho
    relevante ao critério de aceite, incluindo os estados de erro.
-4. Rode os testes (via Bash) e confirme que passam antes de marcar a tarefa como
-   candidata a concluída.
+4. Rode os testes (via Bash) e confirme que passam, e que a cobertura de regra de
+   negócio/lógica atinge 70-80%, antes de marcar a tarefa como candidata a
+   concluída.
 5. Se um teste falhar por um problema real na implementação (não no teste), volte
    para a skill de implementação correspondente corrigir — esta skill não força um
    teste a passar ajustando a asserção para caber no comportamento errado.
@@ -88,6 +94,7 @@ Do NOT use for:
       asserção
 - [ ] Todos os testes passam (rodados via Bash) antes da tarefa ser marcada
       concluída
+- [ ] Cobertura de regra de negócio/lógica de componente/tela atinge 70-80%
 
 ### MUST DO
 - Rodar os testes de fato (via Bash) antes de considerar a tarefa concluída — nunca
@@ -100,3 +107,5 @@ Do NOT use for:
   corrigir a implementação.
 - Marcar uma tarefa como concluída com teste falhando ou sem teste que cubra o
   critério de aceite.
+- Marcar uma tarefa como concluída com cobertura de regra de negócio/lógica abaixo
+  de 70%.

@@ -51,6 +51,11 @@ Para cada ADR/restrição relevante:
    geral (pensar antes de codificar, simplicidade); esta skill adiciona só o que é
    específico deste projeto (stack, padrão arquitetural, requisito de segurança) —
    não repete o que já está na camada base.
+5. **Documentação mínima obrigatória.** Convenção fixa deste ambiente: `backend/` e
+   `frontend/` cada um leva seu próprio `README.md` (setup, comandos de run/test) e
+   `.env.example` versionado com todas as variáveis de ambiente necessárias (nunca
+   o `.env` real com valores reais). Regra obrigatória, não recomendada — bloqueia
+   PR se ausente.
 
 ## Workflow
 
@@ -58,9 +63,11 @@ Para cada ADR/restrição relevante:
    com implicação prática, escreva a regra correspondente.
 2. Percorra a Seção 7 do SDD.md (Segurança); toda regra de autenticação/autorização/
    criptografia que afeta como o código é escrito vira diretriz aqui.
-3. Classifique cada diretriz como obrigatória, proibida ou recomendada.
-4. Adicione exemplo mínimo quando fizer diferença real para quem vai seguir a regra.
-5. Escreva a Seção 1 do `TASK.md` (Diretrizes de Implementação), referenciando
+3. Inclua a diretriz obrigatória de `README.md` + `.env.example` em `backend/` e
+   `frontend/`.
+4. Classifique cada diretriz como obrigatória, proibida ou recomendada.
+5. Adicione exemplo mínimo quando fizer diferença real para quem vai seguir a regra.
+6. Escreva a Seção 1 do `TASK.md` (Diretrizes de Implementação), referenciando
    `coding-guidelines` como camada base em vez de repetir seu conteúdo.
 
 ## Output Esperado
@@ -77,6 +84,8 @@ Para cada ADR/restrição relevante:
 - [ ] Diretriz com potencial de ambiguidade tem exemplo mínimo
 - [ ] Nenhuma diretriz duplica o que `coding-guidelines` já cobre como comportamento
       geral
+- [ ] Diretriz obrigatória de `README.md` + `.env.example` em `backend/` e
+      `frontend/` está presente
 
 ### MUST DO
 - Traduzir todo ADR com implicação prática em regra concreta de implementação, não

@@ -9,8 +9,8 @@ Este documento cobre a lógica dos **comandos** da fase de execução —
 `/executar` (Executor implementa por lote), `/executar_tarefa` (versão de escopo
 mínimo: uma única tarefa por vez, com validação leve), `/validar` (Validador
 audita um lote fechado) e `/deploy` (Validador publica) — e dos comandos
-somente-leitura `/listar` (projeto inteiro, por lote) e `/listar_tarefa` (só as 3
-próximas tarefas elegíveis da fila). Nenhum deles dispara o próximo
+somente-leitura `/listar` (projeto inteiro, por lote) e `/listar_tarefa` (todas as
+tarefas em aberto, em ordem sugerida de execução). Nenhum deles dispara o próximo
 automaticamente: **o
 usuário é o orquestrador**, decide quando rodar cada um. **Exceção documentada**:
 `/executar --continuar` passa a rodar a validação (Comando 2) de cada lote
@@ -52,8 +52,12 @@ comandos de execução ao mesmo tempo pisem uma na outra (edição concorrente d
    tarefas de um lote precisam ver o mesmo `git diff`).
 3. **Encerramento limpo** (fim de lote/tarefa, lote validado, ou publicação, sem
    bloqueio pendente): antes de apresentar o resumo final, integre a worktree de
-   volta ao branch principal (merge/rebase) e remova a worktree (`ExitWorktree`
-   ou equivalente). Esse merge é o que torna `TASK.md`/`BLOCKERS.md`/
+   volta ao branch principal (merge/rebase), remova a worktree (`ExitWorktree`
+   ou equivalente) e **apague a branch local já integrada** com `git branch -d
+   <branch>` (da árvore principal, depois de remover a worktree — remover a
+   worktree não apaga a branch; use `-d`, nunca `-D`, e se o `-d` recusar pare e
+   avise). Vale para qualquer branch de fluxo (`execucao/*`, `fix/*`,
+   `worktree-*`). Esse merge é o que torna `TASK.md`/`BLOCKERS.md`/
    `DEPLOY.md` atualizados visíveis para `/listar`, `/listar_tarefa` e para a
    próxima chamada de qualquer comando — inclusive de outra sessão.
 4. **Encerramento por bloqueio** (tarefa `Bloqueada`, achado crítico, etc.):
@@ -205,7 +209,7 @@ declarado como paralelo à implementação em `validador.md`.
 
 | Dispara quando | Agente | Ação | Pausa obrigatória |
 |---|---|---|---|
-| Usuário roda `/executar_tarefa` (sem argumento) | `executor` (uma única instância, para a primeira tarefa elegível de todo o `TASK.md`); `validador` (validação leve, só `acceptance-criteria-validation`, escopada à tarefa) | Implementa a tarefa, revisão inline, valida só o critério de aceite dela, atualiza Status | Sempre, ao fim da tarefa (execução + validação leve) — nunca encadeia; bloqueio Aberto com prioridade; reprovação da revisão inline após 2 tentativas; reprovação da validação leve |
+| Usuário roda `/executar_tarefa [ID]` (com ID executa exatamente essa tarefa; sem argumento, a primeira elegível de todo o `TASK.md`) | `executor` (uma única instância, numa worktree nova; ao fim, commit + merge na `main` e remoção da worktree se aprovado); `validador` (validação leve, só `acceptance-criteria-validation`, escopada à tarefa) | Implementa a tarefa, revisão inline, valida só o critério de aceite dela, atualiza Status | Sempre, ao fim da tarefa (execução + validação leve) — nunca encadeia; bloqueio Aberto com prioridade; reprovação da revisão inline após 2 tentativas; reprovação da validação leve |
 
 Versão de **escopo mínimo** do Comando 1, pensada para não poluir o contexto:
 processa **uma tarefa por chamada**, nunca um lote inteiro, e sempre para ao
@@ -445,20 +449,25 @@ tarefa, não sugere próximo comando.
 
 ## Comando 4b: `/listar_tarefa` — somente leitura, escopo de tarefa
 
-Versão de escopo mínimo do Comando 4: em vez do projeto inteiro agrupado por
-lote, mostra só as **3 próximas tarefas elegíveis** da fila — o mesmo recorte que
-`/executar_tarefa` (Comando 1b) consumiria uma chamada de cada vez.
+Versão de nível de tarefa do Comando 4: em vez do status agrupado por lote, traz
+**todas as tarefas ainda em aberto** do projeto, numa **ordem sugerida de
+execução**. A 1ª posição coincide com a tarefa que `/executar_tarefa` (Comando 1b)
+pegaria.
 
-1. Percorra a Seção 3 do `TASK.md` na ordem do documento (não agrupe por lote) e
-   monte a fila de tarefas elegíveis: `Pendente`/`Em andamento` com dependências
-   internas (Seção 4) já resolvidas — mesmo critério do item 1 do Comando 1b.
-2. Verifique `BLOCKERS.md` para entradas `Aberto` afetando alguma dessas tarefas,
-   sobretudo a primeira — é ela que faria `/executar_tarefa` parar sem executar
-   nada na próxima chamada.
-3. Apresente as até 3 primeiras tarefas da fila (nome/id, lote, chapéu
-   responsável, critério de aceite resumido, status), destacando no topo
-   qualquer bloqueio `Aberto` afetando a primeira. Menos de 3 tarefas elegíveis
-   não é erro — reporte quantas restam.
+1. Considere em aberto toda tarefa da Seção 3 do `TASK.md` com status diferente de
+   `Concluída` (`Pendente`, `Em andamento`, `Bloqueada`, incluindo `Refatoração
+   Lote-X`).
+2. Ordene pela ordem do documento, reposicionando só o necessário para cada tarefa
+   vir depois das suas dependências (Seção 4) ainda em aberto. Empate: ordem do
+   documento; tarefas paralelas são sinalizadas como paralelizáveis.
+3. Classifique cada uma: elegível, aguardando dependência ou bloqueada
+   (`BLOCKERS.md` `Aberto` ou status `Bloqueada`). Dependência inexistente ou
+   ciclo vai para "Indeterminadas", sem forçar ordem.
+4. Apresente: resumo de contagens, destaque de bloqueio `Aberto` que afete a 1ª
+   tarefa elegível, a lista na ordem sugerida **sempre em formato de tabela markdown** (colunas: #,
+   tarefa id/nome, lote, chapéu, status, classificação, paralelismo — nunca lista
+   com marcadores ou texto corrido) e as indeterminadas, se houver (também em
+   tabela).
 
 Não dispara nenhum agente, não avança tarefa, não sugere próximo comando.
 

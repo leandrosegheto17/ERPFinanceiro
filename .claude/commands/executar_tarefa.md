@@ -1,6 +1,6 @@
 ---
-description: Versão de escopo mínimo do /executar — pega apenas a primeira tarefa elegível (ou o primeiro bloqueio Aberto, se este tiver prioridade) de todo o TASK.md, executa, roda uma validação leve (só critério de aceite) e para. Não processa lote inteiro, não dispara QA/DevSecOps completos, não encadeia.
-argument-hint: (sem argumento — sempre pega o primeiro item elegível da fila)
+description: Versão de escopo mínimo do /executar — executa uma única tarefa (a indicada por argumento, ex. "/executar_tarefa T-055", ou, sem argumento, a primeira elegível da fila), sempre numa worktree nova; ao fim roda validação leve (só critério de aceite), faz commit e integra na main. Não processa lote inteiro, não dispara QA/DevSecOps completos, não encadeia.
+argument-hint: [ID da tarefa, ex. T-055] (opcional — sem argumento pega o primeiro item elegível da fila)
 ---
 
 # Comando `/executar_tarefa` — uma única tarefa, execução + validação leve
@@ -14,10 +14,13 @@ contexto. Ele por sua vez assume o que está declarado em
 
 **Escopo deliberadamente reduzido**, para não poluir o contexto: uma única tarefa
 por chamada, nunca um lote inteiro. Se você quer processar um lote inteiro em
-paralelo, use `/executar`. Este comando **não aceita argumento** — sempre pega o
-primeiro item elegível da fila (tarefa ou bloqueio).
+paralelo, use `/executar`.
 
-Argumento recebido (ignorado, deve estar vazio): $ARGUMENTS
+- `/executar_tarefa T-055` → executa **exatamente** a T-055, nunca "a próxima da lista".
+- `/executar_tarefa` (sem argumento) → pega o primeiro item elegível da fila
+  (tarefa ou bloqueio).
+
+Argumento recebido (ID da tarefa, opcional): $ARGUMENTS
 
 ## 0. Pré-requisitos bloqueantes
 
@@ -26,8 +29,27 @@ git presente, planejamento aprovado (`SDD.md`/`UX-SPEC.md`/`TASK.md`/
 `GUARDRAILS.md`), coluna `Lote` e marcação de paralelismo presentes no `TASK.md`.
 Se algo faltar, pare e avise.
 
+**Worktree nova (sempre)**: depois de determinar o item-alvo (Seção 1) e antes de
+escrever qualquer coisa, crie uma worktree **nova** a partir do HEAD atual da
+`main`, com branch `execucao/executar_tarefa-<ID>` (ex.: `execucao/executar_tarefa-T-055`)
+— `EnterWorktree` ou `git worktree add`. Nunca reaproveite worktree antiga nem
+trabalhe direto na árvore principal. Se já existir worktree/branch com esse nome
+(execução anterior interrompida), **pare** e pergunte ao usuário — não sobrescreva.
+Todos os agentes disparados herdam essa worktree.
+
 ## 1. Determinar o item-alvo (tarefa ou bloqueio)
 
+**Com argumento** (ex.: `T-055`, `S-01`): a tarefa-alvo é essa, e só ela.
+1. Localize o ID na Seção 3 do `TASK.md`. Se não existir, **pare** e informe.
+2. Se já estiver `Concluída`/`Validado`, **pare** e informe (não reexecute sem o
+   usuário pedir).
+3. Se houver dependência não resolvida (Seção 4 do `TASK.md`) ou entrada `Aberto`
+   em `.md/BLOCKERS.md` que a afete, **pare**, mostre o que falta e **não execute** —
+   nunca troque por outra tarefa.
+4. Caso contrário, siga para a Seção 2 com essa tarefa. Os passos abaixo
+   (fila) **não se aplicam**.
+
+**Sem argumento**:
 1. Leia `.md/BLOCKERS.md`. Se houver uma entrada `Aberto` que afete a primeira
    tarefa elegível (ver item 2), **o bloqueio tem prioridade**: pare aqui mesmo,
    apresente a entrada (quem reportou, o quê, "Escala para") e **não execute nada
@@ -87,15 +109,38 @@ sem checagem estrutural de lote.
 todas as tarefas do lote estiverem `Concluída`, rode `/validar` normalmente para o
 veredito de lote (QA completo + DevSecOps + checagem estrutural).
 
-## 4. Encerramento
+## 4. Commit e integração na main
+
+Só se a tarefa terminou **Concluída** e a validação leve **aprovou** (sem bloqueio):
+1. Na worktree, faça o commit da tarefa (código + `TASK.md` atualizado), mensagem
+   `<ID>: <resumo>`, com a linha `Co-Authored-By` de atribuição vigente.
+2. Integre na `main` com merge (`git merge --no-ff execucao/executar_tarefa-<ID>`,
+   mensagem `Merge <ID>: ...`), rodando o merge a partir da árvore principal.
+   Se a `main` avançou, traga-a para a branch antes (merge/rebase na worktree) e
+   rode de novo typecheck/testes da tarefa. Conflito que não seja trivial e
+   mecânico: **pare** e pergunte.
+3. Remova a worktree (`ExitWorktree` / `git worktree remove`) **e depois apague a
+   branch local integrada**: `git branch -d execucao/executar_tarefa-<ID>` (rodado
+   da árvore principal, após remover a worktree — `ExitWorktree`/`worktree remove`
+   sozinhos NÃO apagam a branch). Use `-d`, nunca `-D`: se recusar por "não
+   totalmente mergeada", pare e avise em vez de forçar. Confirme com
+   `git branch --list <branch>` que sumiu. **Não faça `git push`** a menos que o
+   usuário peça.
+
+Se houve bloqueio, reprovação, tarefa `Bloqueada` ou parada em qualquer etapa:
+**não commite na main e não integre** — deixe a worktree como está e informe o caminho
+dela e a branch no resumo.
+
+## 5. Encerramento
 
 Apresente o resumo: qual tarefa foi executada, resultado da revisão inline,
-resultado da validação leve, e status final no `TASK.md`. **Pare aqui sempre** —
+resultado da validação leve, status final no `TASK.md`, hash do commit/merge na
+`main` (ou caminho da worktree deixada aberta). **Pare aqui sempre** —
 este comando nunca encadeia para outra tarefa, nem dispara `/validar` de lote,
 nem `/deploy`. Rodar `/executar_tarefa` de novo (decisão do usuário) pega a
-próxima tarefa/bloqueio da fila.
+próxima tarefa/bloqueio da fila, ou `/executar_tarefa <ID>` uma tarefa específica.
 
-## 5. Bloqueio
+## 6. Bloqueio
 
 Se em qualquer etapa um agente sinalizar bloqueio (relatório próprio ou nova
 entrada `Aberto` em `.md/BLOCKERS.md`): **pare**, explique quem reportou, o quê, e

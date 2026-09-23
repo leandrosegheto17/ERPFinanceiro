@@ -22,6 +22,18 @@
          compilação do esqueleto; troca para o pacote comercial Trial é decisão de T-49 quando
          houver ambiente com GUI para confirmar preview (ver docs/licencas.md, RL1-03). -->
     <PackageReference Include="FastReport.OpenSource" Version="2023.3.13" />
+    <!-- T-49: exportacao PDF do Open Source (plugin separado; docs/licencas.md). -->
+    <PackageReference Include="FastReport.OpenSource.Export.PdfSimple" Version="2023.3.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- T-49: o compilador de expressoes do FastReport referencia Microsoft.CSharp (ver RelatorioListagem). -->
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- T-49: layout .frx embutido; carregado por RelatorioListagem. -->
+    <EmbeddedResource Include="Layouts\ListagemVendas.frx" LogicalName="ERPFinanceiro.Reports.Layouts.ListagemVendas.frx" />
   </ItemGroup>
 
 </Project>

@@ -35,6 +35,13 @@ namespace ERPFinanceiro.Api
         public static Autofac.IContainer Container { get; set; }
 
         /// <summary>
+        /// Chave esperada em <c>X-Api-Key</c> (T-35), lida de <c>Api:ApiKey</c> do App.config
+        /// por <c>ApiHost.Start</c> antes de subir o host (mesmo motivo estático de
+        /// <see cref="Container"/>). <c>null</c>/vazia = falha fechada (tudo, exceto health, 401).
+        /// </summary>
+        public static string ChaveApi { get; set; }
+
+        /// <summary>
         /// Ponto de entrada OWIN (assinatura exigida pelo host, ex.
         /// <c>WebApp.Start&lt;Startup&gt;(url)</c> em <c>ApiHost</c>, T-27).
         /// </summary>
@@ -46,6 +53,7 @@ namespace ERPFinanceiro.Api
             ConfigurarSerializacaoJson(config);
             ConfigurarAutofac(config);
             ConfigurarCorrelationId(config);
+            ConfigurarApiKey(config);
             ConfigurarExceptionHandler(config);
 
             app.UseWebApi(config);
@@ -70,6 +78,15 @@ namespace ERPFinanceiro.Api
         private static void ConfigurarCorrelationId(HttpConfiguration config)
         {
             config.MessageHandlers.Add(new CorrelationIdHandler(new CorrelationContext()));
+        }
+
+        /// <summary>
+        /// Registra o <see cref="ApiKeyHandler"/> (T-35) depois do <see cref="CorrelationIdHandler"/>
+        /// (handlers rodam na ordem de registro), antes do roteamento.
+        /// </summary>
+        private static void ConfigurarApiKey(HttpConfiguration config)
+        {
+            config.MessageHandlers.Add(new ApiKeyHandler(ChaveApi));
         }
 
         private static void ConfigurarRoteamento(HttpConfiguration config)

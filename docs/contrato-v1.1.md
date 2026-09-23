@@ -224,6 +224,28 @@ Valores possíveis de `status` (string, PascalCase — P-3): `"Pendente"`, `"Qui
 }
 ```
 
+### 3.3.1 Erros transversais (qualquer endpoint)
+
+**409 — conflito de concorrência** (`VERSAO` não resolvida após 3 tentativas de releitura; o cliente pode repetir a requisição):
+```json
+{
+  "erro": {
+    "codigo": "CONFLITO_CONCORRENCIA",
+    "mensagem": "Conflito de concorrência ao atualizar a venda V-000123. Tente novamente."
+  }
+}
+```
+
+**500 — erro interno** (mensagem genérica; nunca inclui stack trace nem detalhe da exceção):
+```json
+{
+  "erro": {
+    "codigo": "ERRO_INTERNO",
+    "mensagem": "Erro interno. Tente novamente mais tarde."
+  }
+}
+```
+
 ### 3.4 `POST /api/vendas` (aditivo — registrar Pendente; A VALIDAR D-03/P-9)
 
 Entrada: mesmo payload de `POST /api/vendas/quitacao`.

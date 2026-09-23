@@ -129,6 +129,7 @@ namespace ERPFinanceiro.Tests.Desktop
             using (var host = new ApiHost(container))
             {
                 int porta = ObterPortaLivre();
+                ERPFinanceiro.Api.Startup.ChaveApi = "chave-teste-t35";
                 host.Start(porta);
                 Assert.Equal(EstadoApiHost.Ativa, host.Estado);
 
@@ -136,6 +137,8 @@ namespace ERPFinanceiro.Tests.Desktop
 
                 using (var client = new HttpClient())
                 {
+                    client.DefaultRequestHeaders.Add("X-Api-Key", "chave-teste-t35");
+
                     // Cenário 1: venda inexistente -> 200 {status:"Quitada",dataQuitacao}.
                     string corpoValido = $@"{{
                         ""vendaId"": ""{vendaIdNova}"",

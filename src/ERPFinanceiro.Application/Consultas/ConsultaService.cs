@@ -70,6 +70,21 @@ namespace ERPFinanceiro.Application.Consultas
             return new ResultadoListagemVendas(itens, truncado);
         }
 
+        /// <summary>
+        /// Mesma listagem de <see cref="Listar"/> (mesma ordenação, mesmo filtro), porém SEM o
+        /// limite de <see cref="LimiteListagem"/> (T-48/D-10: o relatório não trunca).
+        /// </summary>
+        public IReadOnlyList<VendaListagemDto> ListarSemLimite(FiltroVendas filtro)
+        {
+            if (_leitura == null)
+            {
+                throw new InvalidOperationException(
+                    "ConsultaService.ListarSemLimite requer IVendaConsultaLeitura (parâmetro 'leitura' do construtor).");
+            }
+
+            return _leitura.ListarMaisRecentes(int.MaxValue).Select(MapearParaListagemDto).ToList();
+        }
+
         private static VendaListagemDto MapearParaListagemDto(Venda venda)
         {
             return new VendaListagemDto

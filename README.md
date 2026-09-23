@@ -27,16 +27,19 @@ Módulo Financeiro do desafio ERP: um aplicativo Windows (Desktop, .NET Framewor
 | Domínio, Application, Infrastructure (EF6 + Firebird), esquema e seed SQL | Implementados (Lotes 1 a 6) |
 | API: host OWIN, JSON, correlation id, tratamento global de erros | Implementados |
 | API: endpoint `POST /api/vendas/quitacao` | Implementado (`VendasController`) |
-| API: `POST /api/vendas/cancelamento`, `GET /api/vendas/{id}/status`, `POST /api/vendas`, `GET /api/health`, alias `/api/v1` | **PENDENTE** (não existem no código nesta data) |
-| API: autenticação por `X-Api-Key` | **PENDENTE** (nenhum handler no código; a chave `Api:ApiKey` existe só no `App.config.example`) |
-| Leitura de `Api:Porta` e `Api:ApiKey` do `App.config` | **PENDENTE** (o código atual lê apenas `Banco:*` e `Log:CaminhoArquivo`) |
+| API: `GET /api/health` | Implementado (`HealthController`, T-36) |
+| API: `POST /api/vendas/cancelamento`, `GET /api/vendas/{id}/status`, `POST /api/vendas`, alias `/api/v1` | **PENDENTE** (não existem no código nesta data) |
+| API: autenticação por `X-Api-Key` | Implementada (`ApiKeyHandler`, T-35; isenta `GET /api/health`) |
+| Leitura de `Api:ApiKey` do `App.config` | Implementada (`ApiHost`) |
+| Leitura de `Api:Porta` do `App.config` | **PENDENTE** (T-46) |
 | Executável Desktop | **PENDENTE**: `Program.Main` ainda lança `NotImplementedException` ("Esqueleto T-04"); tela, splash e início do host chegam em T-26/T-42/T-46 |
-| Relatório (FastReport) e tela (DevExpress) | **PENDENTE** (T-49/T-50); o projeto `ERPFinanceiro.Reports` só referencia o FastReport.OpenSource |
+| Relatório de listagem (FastReport, PDF): `RelatorioDataSource` e `RelatorioListagem` | Implementado (T-48/T-49) |
+| Tela (DevExpress) e preview do relatório | **PENDENTE** (T-50) |
 | Pacote de entrega (pasta com executável, DLLs Firebird, `.sql`, `.fdb` de demonstração) | **PENDENTE** (T-53) |
 | Evidências (prints e PDF) em `docs/evidencias/` | **PENDENTE** (T-55) |
 | Teste em máquina limpa seguindo este README | **PENDENTE** (T-56) |
 
-Consequência prática: hoje é possível compilar a solução, criar o banco a partir dos scripts e rodar os testes automatizados; **ainda não é possível abrir o aplicativo**. As seções 5 a 8 documentam a configuração e o contrato já definidos, para uso assim que as tarefas pendentes forem entregues.
+Consequência prática: hoje é possível compilar a solução, criar o banco a partir dos scripts, gerar o relatório em PDF por código e rodar os testes automatizados; **ainda não é possível abrir o aplicativo**. As seções 5 a 8 documentam a configuração e o contrato já definidos, para uso assim que as tarefas pendentes forem entregues.
 
 ## 2. Pré-requisitos
 
@@ -71,7 +74,7 @@ Há dois caminhos, ambos de custo zero (detalhes e decisão em `docs/licencas.md
 - **FastReport .NET Trial** (caminho preferencial para preview dentro do WinForms): instalador oficial em fast-report.com. Tem preview "In Application" e exportação PDF nativa; espera-se marca d'água durante a avaliação; duração **a confirmar** na instalação real.
 - **FastReport Open Source** (MIT, sem expiração): sem componente de preview em WinForms e com exportação PDF em plugin separado.
 
-Hoje o projeto `ERPFinanceiro.Reports` referencia o pacote **FastReport.OpenSource 2023.3.13**. Qual dos dois será efetivamente empacotado na entrega e o motivo: **PENDENTE** (definido em T-49/T-53; atualizar esta seção). Fluxo previsto (ADR-008): preview quando disponível, com fallback automático para exportação em PDF.
+Hoje o projeto `ERPFinanceiro.Reports` referencia **FastReport.OpenSource 2023.3.13** e **FastReport.OpenSource.Export.PdfSimple 2023.3.13** (exportação PDF). Qual dos dois será efetivamente empacotado na entrega e o motivo: **PENDENTE** (definido em T-49/T-53; atualizar esta seção). Fluxo previsto (ADR-008): preview quando disponível, com fallback automático para exportação em PDF.
 
 ## 4. Obter e compilar o código
 
@@ -99,7 +102,7 @@ Copie `src/ERPFinanceiro.Desktop/App.config.example` para `App.config` na pasta 
 | Chave | Valor no exemplo | Significado |
 |---|---|---|
 | `Api:Porta` | `5000` | Porta do host OWIN em `http://localhost:{porta}/`. *Leitura pelo código: PENDENTE (T-46).* |
-| `Api:ApiKey` | `COLOQUE_UMA_CHAVE_LOCAL_AQUI` | Chave exigida no header `X-Api-Key`. Defina uma chave local sua; a mesma deve ser configurada no Vendas. *Validação no código: PENDENTE.* |
+| `Api:ApiKey` | `COLOQUE_UMA_CHAVE_LOCAL_AQUI` | Chave exigida no header `X-Api-Key`. Defina uma chave local sua; a mesma deve ser configurada no Vendas. |
 | `Banco:CaminhoFdb` | `C:\ERPFinanceiro\data\financeiro.fdb` | Caminho do `.fdb`. Criado pelo `DbInitializer` se ausente. Lida por `ConfiguracaoBancoAppConfig`; obrigatória. |
 | `Banco:Usuario` | `SYSDBA` | Usuário do Firebird embarcado. Obrigatória. |
 | `Banco:Senha` | `COLOQUE_A_SENHA_LOCAL_AQUI` | Senha local. Obrigatória. |
@@ -142,7 +145,7 @@ Um `.fdb` de demonstração pronto será entregue no pacote (T-53, **PENDENTE**)
 1. Copiar a pasta de entrega (T-53) para um diretório qualquer (ex.: `C:\ERPFinanceiro`).
 2. Copiar `App.config.example` para `App.config` e preencher chave, senha e caminhos (seção 5).
 3. Executar `ERPFinanceiro.Desktop.exe`. Ele abre o banco, aplica o schema se necessário e inicia a API em `http://localhost:{Api:Porta}/`.
-4. Verificar com `curl http://localhost:5000/api/health` (endpoint **PENDENTE**).
+4. Verificar com `curl http://localhost:5000/api/health` (endpoint implementado, sem `X-Api-Key`; o executável ainda não sobe).
 
 Atualize esta seção com os passos reais na T-53/T-56.
 
@@ -152,7 +155,7 @@ Contrato completo (proposta v1.1, **ainda não enviada nem aceita** pelo lado Ve
 
 - Base: `http://localhost:{porta}/` (somente a máquina local por padrão).
 - Formato: JSON UTF-8, propriedades em camelCase, decimais como número, datas ISO 8601 UTC (`...Z`). Toda resposta traz o header `X-Correlation-Id`.
-- Autenticação (definida no contrato; **PENDENTE** no código): header `X-Api-Key` em todos os endpoints, exceto `GET /api/health`. Ausente ou inválida: `401 NAO_AUTORIZADO`.
+- Autenticação (implementada, T-35): header `X-Api-Key` em todos os endpoints, exceto `GET /api/health`. Ausente ou inválida: `401 NAO_AUTORIZADO`.
 
 | Endpoint | Estado no código |
 |---|---|
@@ -160,7 +163,7 @@ Contrato completo (proposta v1.1, **ainda não enviada nem aceita** pelo lado Ve
 | `POST /api/vendas/cancelamento` | PENDENTE |
 | `GET /api/vendas/{vendaId}/status` | PENDENTE |
 | `POST /api/vendas` (registrar Pendente, aditivo, a validar) | PENDENTE |
-| `GET /api/health` (sem autenticação, aditivo, a validar) | PENDENTE |
+| `GET /api/health` (sem autenticação, aditivo, a validar) | Implementado |
 | Alias `/api/v1/vendas/...` (aditivo, a validar) | PENDENTE |
 
 Exemplo (quitação), conforme o contrato:
@@ -207,14 +210,15 @@ Fonte: `PackageReference` de todos os `.csproj` da solução e do spike, mais `d
 | EntityFramework | 6.5.1 | Infrastructure | Apache-2.0 |
 | EntityFramework.Firebird | 10.1.0 | Infrastructure | Initial Developer's Public License 1.0 (IDPL) |
 | FirebirdSql.Data.FirebirdClient | 10.3.4 | Infrastructure, Tests | Initial Developer's Public License 1.0 (IDPL) |
-| Microsoft.AspNet.WebApi.Core | 5.3.0 | Api, Desktop (transitivo) | MIT |
-| Microsoft.AspNet.WebApi.Owin | 5.3.0 | Api | MIT |
+| Microsoft.AspNet.WebApi.Core | 5.3.0 | Api, Desktop (transitivo) | Apache-2.0 |
+| Microsoft.AspNet.WebApi.Owin | 5.3.0 | Api | Apache-2.0 |
 | Microsoft.Owin.Host.HttpListener | 4.2.2 | Api | Apache-2.0 |
 | Microsoft.Owin.Hosting | 4.2.2 | Desktop | Apache-2.0 |
 | Autofac | 6.5.0 | Api, Desktop, Tests | MIT |
 | Autofac.WebApi2 | 6.1.1 | Api, Desktop | MIT |
 | Newtonsoft.Json | 13.0.3 | Api | MIT |
 | FastReport.OpenSource | 2023.3.13 | Reports | MIT |
+| FastReport.OpenSource.Export.PdfSimple | 2023.3.13 | Reports | MIT |
 
 ### Pacotes de teste (não vão para a entrega)
 

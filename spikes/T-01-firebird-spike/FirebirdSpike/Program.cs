@@ -167,7 +167,7 @@ namespace FirebirdSpike
 
                 // ---- Criterio 3: bitness ----
                 Check("CA-3 bitness registrada", true,
-                    "PlatformTarget=x64, DLLs do pacote win64 (fbclient.dll x64) - ver ADR-009 e docs/licencas-bin.md");
+                    "PlatformTarget=x64, DLLs do pacote win64 (fbclient.dll x64) - ver ADR-009 e docs/licencas.md");
 
                 // ---- Violacao de UNIQUE(VENDA_ID) distinguivel (apoio ao criterio de concorrencia) ----
                 using (var conn = new FbConnection(connStr))

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App.config.example — ERPFinanceiro.Desktop
+
+  Copie este arquivo para "App.config" (ignorado no git, ver .gitignore da
+  solução) e preencha os valores reais localmente. NUNCA versionar ApiKey,
+  senha do banco ou connection string real (G-6/24, GUARDRAILS.md).
+
+  Registro manual de DbProviderFactories/entityFramework/providers necessário
+  porque o projeto usa PackageReference (SDK-style) em vez do install.ps1 dos
+  pacotes NuGet clássicos — ver ADR-009 ("Nota de infraestrutura") e
+  spikes/T-01-firebird-spike/FirebirdSpike/App.config como referência.
+-->
+<configuration>
+  <configSections>
+    <section name="entityFramework" type="System.Data.Entity.Internal.ConfigFile.EntityFrameworkSection, EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" requirePermission="false" />
+  </configSections>
+
+  <startup>
+    <supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.8" />
+  </startup>
+
+  <appSettings>
+    <!-- Porta do host OWIN self-host (T-27). -->
+    <add key="Api:Porta" value="5000" />
+    <!-- Chave de autenticação exigida em todo endpoint exceto GET /api/health (G-5/22). -->
+    <add key="Api:ApiKey" value="COLOQUE_UMA_CHAVE_LOCAL_AQUI" />
+    <!-- Caminho do .fdb embarcado; criado por DbInitializer (T-12) se ausente. -->
+    <add key="Banco:CaminhoFdb" value="C:\ERPFinanceiro\data\financeiro.fdb" />
+    <add key="Banco:Usuario" value="SYSDBA" />
+    <add key="Banco:Senha" value="COLOQUE_A_SENHA_LOCAL_AQUI" />
+    <!-- Caminho do arquivo de log do TraceLogger (T-21); passado pelo composition
+         root (T-26) ao construtor de TraceLogger — nunca hardcoded. -->
+    <add key="Log:CaminhoArquivo" value="C:\ERPFinanceiro\data\logs\app.log" />
+  </appSettings>
+
+  <connectionStrings>
+    <!-- ServerType=1 => Embedded (ADR-002/ADR-009). Ajustar caminho/credenciais via appSettings acima
+         ou diretamente aqui, conforme decisão de T-12/T-26. -->
+    <add name="FinanceiroDbContext"
+         connectionString="User=SYSDBA;Password=COLOQUE_A_SENHA_LOCAL_AQUI;Database=C:\ERPFinanceiro\data\financeiro.fdb;DataSource=localhost;Port=3050;Dialect=3;Charset=UTF8;ServerType=1;"
+         providerName="FirebirdSql.Data.FirebirdClient" />
+  </connectionStrings>
+
+  <entityFramework>
+    <defaultConnectionFactory type="EntityFramework.Firebird.FbConnectionFactory, EntityFramework.Firebird" />
+    <providers>
+      <provider invariantName="FirebirdSql.Data.FirebirdClient" type="EntityFramework.Firebird.FbProviderServices, EntityFramework.Firebird" />
+    </providers>
+  </entityFramework>
+
+  <system.data>
+    <DbProviderFactories>
+      <remove invariant="FirebirdSql.Data.FirebirdClient" />
+      <add name="FirebirdClient Data Provider" invariant="FirebirdSql.Data.FirebirdClient"
+           description=".Net Framework Data Provider for Firebird"
+           type="FirebirdSql.Data.FirebirdClient.FirebirdClientFactory, FirebirdSql.Data.FirebirdClient" />
+    </DbProviderFactories>
+  </system.data>
+</configuration>

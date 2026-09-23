@@ -1,0 +1,38 @@
+NOTA: gerado por um harness de console descartavel (nao versionado, análogo ao
+projeto do spike T-01), reaproveitando as DLLs nativas do Firebird 3.0.12 x64
+extraidas em spikes/T-01-firebird-spike/FirebirdSpike/bin/Debug/net48/. O harness
+usa FbConnection.CreateDatabase para criar um .fdb NOVO, aplica database/01-schema.sql
+via FirebirdSql.Data.Isql.FbScript/FbBatchExecution (parser de script isql, entende
+SET TERM — mesmo mecanismo previsto para o DbInitializer de T-12), depois valida via
+consultas RDB$ (RDB$RELATIONS, RDB$INDICES, RDB$RELATION_CONSTRAINTS, RDB$TRIGGERS,
+RDB$RELATION_FIELDS/RDB$FIELDS) e exercita os CHECKs/FK CASCADE/triggers de
+append-only com INSERT/UPDATE/DELETE reais.
+
+== T-05 database/01-schema.sql - execucao real ==
+Processo: x64
+Script: C:\Users\leand\OneDrive\Projetos\Cartsys\ERPFinanceiro\.claude\worktrees\execucao+executar-lote1\database\01-schema.sql
+[PASS] Criacao .fdb novo - arquivo criado em C:\Users\leand\AppData\Local\Temp\claude\c--Users-leand-OneDrive-Projetos-Cartsys-ERPFinanceiro\c206686f-8643-4691-a009-2df8baf8727d\scratchpad\SchemaTest\bin\Debug\net48\T05_SCHEMA_TEST.FDB
+[INFO] Script executado sem excecao (11 statements).
+[PASS] Script roda no .fdb novo sem erro - 11 statements executados
+[PASS] Nomes de tabela <= 31 chars - maior nome: 'FIN_VENDA_HISTORICO' (19 chars)
+[PASS] Nomes de indice <= 31 chars - maior nome: 'IDX_FIN_VENDA_ITEM_VENDA' (24 chars)
+[PASS] Nomes de constraint <= 31 chars - maior nome: 'FK_FIN_VENDA_ITEM_VENDA' (23 chars)
+[PASS] Nomes de trigger <= 31 chars - maior nome: 'TRG_FIN_VENDA_HIST_NO_UPD' (25 chars)
+[PASS] Tabela FIN_VENDA existe - count=1
+[PASS] Tabela FIN_VENDA_ITEM existe - count=1
+[PASS] Tabela FIN_VENDA_HISTORICO existe - count=1
+[PASS] FIN_VENDA.VALOR_TOTAL DECIMAL(18,2) - precision=18, scale=2
+[PASS] FIN_VENDA_ITEM.PRECO_UNITARIO DECIMAL(18,4) - precision=18, scale=4
+[PASS] UNIQUE(VENDA_ID) em FIN_VENDA - count=1
+[PASS] FIN_VENDA.CLIENTE_ID anulavel - anulavel=True
+[PASS] FIN_VENDA.VALOR_TOTAL anulavel - anulavel=True
+[PASS] Sem trigger em FIN_VENDA (nenhum trigger de VERSAO) - triggers encontrados=0
+[PASS] CHECK QUANTIDADE > 0 rejeita 0 - insert rejeitado como esperado
+[PASS] CHECK PRECO_UNITARIO >= 0 aceita 0 - insert aceito como esperado
+[PASS] CHECK PRECO_UNITARIO >= 0 rejeita negativo - insert rejeitado como esperado
+[PASS] FK CASCADE em FIN_VENDA_ITEM - itens restantes apos DELETE da venda=0
+[PASS] Trigger bloqueia UPDATE em FIN_VENDA_HISTORICO - UPDATE rejeitado
+[PASS] Trigger bloqueia DELETE em FIN_VENDA_HISTORICO - DELETE rejeitado
+
+== Resultado: 21 PASS / 0 FAIL ==
+=> OK

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SDD 2.1: Domain não referencia nenhum outro projeto nem pacote NuGet (G-3/9). -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>ERPFinanceiro.Domain</RootNamespace>
+    <AssemblyName>ERPFinanceiro.Domain</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- T-11: FinanceiroDbContext (Infrastructure) mapeia coleções privadas do agregado Venda
+         (Itens/Historico) via propriedades internal ICollection<T> (ItensEf/HistoricoEf, ver
+         Venda.cs) — EF6 clássico exige ICollection<T> mutável para navegação, e a API pública
+         do domínio continua somente-leitura (IReadOnlyList). Domain continua sem NuGet/
+         ProjectReference (G-3/9); só concede visibilidade de "internal" a este assembly amigo. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>ERPFinanceiro.Infrastructure</_Parameter1>
+    </AssemblyAttribute>
+    <!-- T-11 (teste de integração): precisa incrementar Versao manualmente (Id/Versao são
+         "internal set", regra 8 — a aplicação incrementa, nunca trigger) para reproduzir o
+         mesmo roteiro de conflito de concorrência do spike (ADR-009/T-01, SpikeContext). -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>ERPFinanceiro.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

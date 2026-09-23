@@ -1,0 +1,52 @@
+NOTA: gerado por um harness de console descartavel (nao versionado, analogo ao
+usado em T-05), reaproveitando as DLLs nativas do Firebird 3.0.12 x64 extraidas
+em spikes/T-01-firebird-spike/FirebirdSpike/bin/Debug/net48/. O harness usa
+FbConnection.CreateDatabase para criar um .fdb NOVO, aplica database/01-schema.sql
+seguido de database/02-seed.sql via FirebirdSql.Data.Isql.FbScript/FbBatchExecution
+(parser de script isql, entende SET TERM — mesmo mecanismo previsto para o
+DbInitializer de T-12), depois valida por SELECT que as 3 vendas, itens e
+historico foram inseridos e os totais batem (CA-07.3).
+
+== T-06 database/02-seed.sql - execucao real ==
+Processo: x64
+Schema: database/01-schema.sql
+Seed:   database/02-seed.sql
+
+[PASS] Criacao .fdb novo
+[INFO] 01-schema.sql executado sem excecao.
+[INFO] 02-seed.sql executado sem excecao (script roda no .fdb apos o schema).
+[PASS] Seed roda apos schema sem erro
+[PASS] 3+ vendas inseridas - count=3
+[PASS] Itens inseridos (V-1001 + V-1002, 2 cada) - count=4
+[PASS] Historico inserido (2+1+1) - count=4
+[PASS] V-1001 STATUS=1 (Quitada) - lido=1
+[PASS] V-1001 CLIENTE_ID preenchido
+[PASS] V-1001 VALOR_TOTAL=500.50 - lido=500,5
+[PASS] V-1001 tem 2 itens
+[PASS] V-1001 VALOR_TOTAL bate com soma dos itens - soma itens=500,5, VALOR_TOTAL=500.50
+[PASS] V-1001 historico Recebida->Quitacao (2 entradas)
+[PASS] V-1002 STATUS=0 (Pendente) - lido=0
+[PASS] V-1002 CLIENTE_ID preenchido
+[PASS] V-1002 VALOR_TOTAL=450.50 - lido=450,5
+[PASS] V-1002 tem 2 itens
+[PASS] V-1002 VALOR_TOTAL bate com soma dos itens - soma itens=450,5, VALOR_TOTAL=450.50
+[PASS] V-1002 historico so Recebida (1 entrada)
+[PASS] V-1003 STATUS=2 (Cancelada) - lido=2
+[PASS] V-1003 CLIENTE_ID nulo (D-08/ADR-007)
+[PASS] V-1003 VALOR_TOTAL nulo (D-08/ADR-007)
+[PASS] V-1003 sem itens (ADR-007: "Sem itens")
+[PASS] V-1003 historico so Cancelamento (1 entrada, STATUS_ANTERIOR NULL)
+[PASS] Soma total da massa = 951.00 (CA-07.3, documentada no cabecalho do seed)
+
+== Resultado: 23 PASS / 0 FAIL ==
+=> OK
+
+Interpretacao registrada (desvio pequeno, resolvido pelo Executor/chapeu DB):
+a linha T-06 do TASK.md ilustra genericamente "Cancelada-sem-quitacao tem so
+Recebida->Cancelamento", mas o cenario concretamente pedido na mesma linha e
+explicitamente o D-08 (CLIENTE_ID/VALOR_TOTAL nulos "nessa ultima"), que e o
+caso "venda desconhecida" do ADR-007 - decisao ja ratificada de SEM itens e
+historico so com Cancelamento (STATUS_ANTERIOR NULL), sem Recebida previa. O
+seed segue o ADR-007 (decisao de arquitetura ja tomada) em vez do exemplo
+ilustrativo generico da linha da tarefa; detalhe documentado no cabecalho de
+database/02-seed.sql.

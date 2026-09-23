@@ -17,4 +17,13 @@
 - **Consequências:** (+) zero instalação para o avaliador, alinhado ao Vendas. (-) risco de provider, bitness, um processo por `.fdb`.
 
 ### Resultado do spike
-_(a preencher: data, go/no-go, observações)_
+**22/09/2026 — GO.** Roteiro executado em `spikes/T-01-firebird-spike/` (evidência em
+`evidencia-execucao.txt` e detalhe completo em
+[`ADR-009`](009-spike-firebird-resultado-go.md)). Critérios 1-2 (decimal e
+identity), 4 (conflito por `VERSAO`) do roteiro do ADR-002 passam via EF6 +
+`EntityFramework.Firebird`; bitness definida como **x64**. Critério 5 (violação
+de `UNIQUE` distinguível) não bloqueou o GO — ver nota em ADR-009. Critério 6
+(`Skip/Take`) não exercitado neste spike; fica coberto por T-11/T-14
+(comportamento padrão de LINQ-to-Entities, sem indício de risco adicional).
+`ADR-002` permanece **Aceito**; `ADR-009` é o registro formal do
+resultado/decisão de liberar T-04, T-05, T-11, T-12.

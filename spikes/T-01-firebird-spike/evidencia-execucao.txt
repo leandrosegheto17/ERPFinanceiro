@@ -1,0 +1,13 @@
+== T-01 Spike Firebird go/no-go - ERP Financeiro ==
+Data/hora (UTC): 2026-09-22 19:02:35Z
+Processo: x64
+
+[PASS] Criacao .fdb embarcado - arquivo criado em C:\Users\leand\OneDrive\Projetos\Cartsys\ERPFinanceiro\.claude\worktrees\execucao+executar-lote1\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\spike.fdb
+[INFO] DDL aplicado (FIN_VENDA minima para o spike).
+[PASS] CA-1 INSERT+SELECT decimal - gravado 1250.50, lido 1250,5
+[INFO] Primeiro contexto salvou com sucesso (VERSAO -> 1).
+[PASS] CA-2 conflito de concorrencia via VERSAO - DbUpdateConcurrencyException: Store update, insert, or delete statement affected an unexpected number of rows (0). Entities may have been modified or deleted since entities were loaded. See http://go.microsoft.com/fwlink/?LinkId=472540 for information on understanding and handling optimistic concurrency exceptions.
+[PASS] CA-3 bitness registrada - PlatformTarget=x64, DLLs do pacote win64 (fbclient.dll x64) - ver ADR-009 e docs/licencas-bin.md
+
+== Resultado: 4 PASS / 0 FAIL ==
+=> GO

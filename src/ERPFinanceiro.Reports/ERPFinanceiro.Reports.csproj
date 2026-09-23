@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SDD 2.1: Reports referencia só Application (RelatorioDataSource usa ConsultaService). -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>ERPFinanceiro.Reports</RootNamespace>
+    <AssemblyName>ERPFinanceiro.Reports</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ERPFinanceiro.Application\ERPFinanceiro.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- FastReport Open Source (MIT) do NuGet público — caminho preferencial é FastReport .NET
+         Trial (T-02/RL1-03), que NÃO tem pacote NuGet público instalável neste ambiente sandbox
+         (requer instalador/licença). Fica registrado aqui o pacote Open Source como base de
+         compilação do esqueleto; troca para o pacote comercial Trial é decisão de T-49 quando
+         houver ambiente com GUI para confirmar preview (ver docs/licencas.md, RL1-03). -->
+    <PackageReference Include="FastReport.OpenSource" Version="2023.3.13" />
+  </ItemGroup>
+
+</Project>

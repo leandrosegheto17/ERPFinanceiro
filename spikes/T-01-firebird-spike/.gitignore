@@ -1,0 +1,4 @@
+# Projeto descartável (T-01). Não faz parte da solução final (essa é criada em T-04).
+bin/
+obj/
+*.fdb

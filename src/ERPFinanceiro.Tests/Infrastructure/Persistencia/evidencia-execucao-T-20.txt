@@ -1,0 +1,46 @@
+T-20 — harness de concorrência e idempotência (TASK.md Lote 5)
+Executado em: 2026-09-23T00:24:29Z
+==============================================================================
+
+Cenário 1 — criação concorrente da mesma vendaId (2 quitações via Task.WhenAll, 20 execuções)
+------------------------------------------------------------------------------
+  [01/20] vendaId=V-T20-CRIACAO-01 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [02/20] vendaId=V-T20-CRIACAO-02 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [03/20] vendaId=V-T20-CRIACAO-03 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [04/20] vendaId=V-T20-CRIACAO-04 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [05/20] vendaId=V-T20-CRIACAO-05 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [06/20] vendaId=V-T20-CRIACAO-06 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [07/20] vendaId=V-T20-CRIACAO-07 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [08/20] vendaId=V-T20-CRIACAO-08 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [09/20] vendaId=V-T20-CRIACAO-09 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [10/20] vendaId=V-T20-CRIACAO-10 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [11/20] vendaId=V-T20-CRIACAO-11 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [12/20] vendaId=V-T20-CRIACAO-12 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [13/20] vendaId=V-T20-CRIACAO-13 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [14/20] vendaId=V-T20-CRIACAO-14 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [15/20] vendaId=V-T20-CRIACAO-15 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [16/20] vendaId=V-T20-CRIACAO-16 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [17/20] vendaId=V-T20-CRIACAO-17 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [18/20] vendaId=V-T20-CRIACAO-18 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [19/20] vendaId=V-T20-CRIACAO-19 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+  [20/20] vendaId=V-T20-CRIACAO-20 | A=sucesso (Quitada) | B=sucesso (Quitada) | historico.Quitacao=1 | venda.Status=Quitada
+
+  Resumo: 20/20 com ambas as tentativas em sucesso (idempotência resolvida sem conflito observável), 0/20 com 1 sucesso + 1 ConcorrenciaException (409 — risco documentado do <remarks> de QuitacaoService.cs, reproduzido ou não conforme acima).
+
+Cenário 2 — repetição sequencial da mesma quitação (idempotência, P-2)
+------------------------------------------------------------------------------
+  1ª chamada: sucesso (Quitada) | 2ª chamada (repetição): sucesso (Quitada) | historico.Quitacao=1
+
+Cenário 3 — quitar/cancelar concorrentes na mesma venda Pendente
+------------------------------------------------------------------------------
+  [1/5] vendaId=V-T20-QUITARCANCELAR-01 | Quitação=sucesso (Quitada) | Cancelamento=MotivoObrigatorioException (409, resultado esperado/conhecido) | venda.Status=Quitada | transições reais=1
+  [2/5] vendaId=V-T20-QUITARCANCELAR-02 | Quitação=sucesso (Quitada) | Cancelamento=MotivoObrigatorioException (409, resultado esperado/conhecido) | venda.Status=Quitada | transições reais=1
+  [3/5] vendaId=V-T20-QUITARCANCELAR-03 | Quitação=sucesso (Quitada) | Cancelamento=MotivoObrigatorioException (409, resultado esperado/conhecido) | venda.Status=Quitada | transições reais=1
+  [4/5] vendaId=V-T20-QUITARCANCELAR-04 | Quitação=sucesso (Quitada) | Cancelamento=MotivoObrigatorioException (409, resultado esperado/conhecido) | venda.Status=Quitada | transições reais=1
+  [5/5] vendaId=V-T20-QUITARCANCELAR-05 | Quitação=VendaJaCanceladaException (409, resultado esperado/conhecido) | Cancelamento=sucesso (Cancelada) | venda.Status=Cancelada | transições reais=1
+==============================================================================
+Resultado final: 20/20 execuções do cenário de criação concorrente sem
+exceção não tratada (nenhuma exceção fora de ConcorrenciaException/
+VendaJaCanceladaException/MotivoObrigatorioException); em todas, exatamente
+1 venda e 1 histórico de quitação ao final.
+Risco documentado em QuitacaoService.cs <remarks> NÃO reproduzido nesta execução (as 20 corridas de criação resolveram com sucesso duplo/idempotente).

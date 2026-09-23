@@ -3,6 +3,8 @@ using System.Linq;
 using System.Web.Http;
 using ERPFinanceiro.Api.Dtos;
 using ERPFinanceiro.Application.Commands;
+using ERPFinanceiro.Application.Exceptions;
+using ERPFinanceiro.Application.Validacao;
 using ERPFinanceiro.Application.Servicos;
 
 namespace ERPFinanceiro.Api.Controllers
@@ -28,8 +30,11 @@ namespace ERPFinanceiro.Api.Controllers
     {
         private readonly QuitacaoService _quitacaoService;
 
-        public VendasController(QuitacaoService quitacaoService)
+        private readonly CancelamentoService _cancelamentoService;
+
+        public VendasController(QuitacaoService quitacaoService, CancelamentoService cancelamentoService)
         {
+            _cancelamentoService = cancelamentoService ?? throw new ArgumentNullException(nameof(cancelamentoService));
             _quitacaoService = quitacaoService ?? throw new ArgumentNullException(nameof(quitacaoService));
         }
 
@@ -69,6 +74,30 @@ namespace ERPFinanceiro.Api.Controllers
             };
 
             return Ok(resposta);
+        }
+
+        /// <summary>
+        /// <c>POST /api/vendas/cancelamento</c> (contrato-v1.1.md Seção 3.2, T-32). 200
+        /// <c>{status:"Cancelada"}</c> para Pendente, já Cancelada (idempotente, P-2) e
+        /// desconhecida (D-08). <c>vendaId</c> vazio -> 400 PAYLOAD_INVALIDO; Quitada sem
+        /// motivo -> MotivoObrigatorioException (409 MOTIVO_OBRIGATORIO, via GlobalExceptionHandler).
+        /// </summary>
+        [HttpPost]
+        [Route("cancelamento")]
+        public IHttpActionResult Cancelamento([FromBody] CancelamentoRequestDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto?.VendaId))
+            {
+                throw new ValidacaoException(new ErroValidacao("PAYLOAD_INVALIDO", "O campo 'vendaId' é obrigatório."));
+            }
+
+            ResultadoCancelamento resultado = _cancelamentoService.Cancelar(new CancelarVendaCommand
+            {
+                VendaId = dto.VendaId,
+                Motivo = dto.Motivo
+            });
+
+            return Ok(new CancelamentoResponseDto { Status = resultado.Status.ToString() });
         }
     }
 }

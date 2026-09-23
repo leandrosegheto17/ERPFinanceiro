@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Report ScriptLanguage="CSharp" ReportInfo.Name="ListagemVendas" ReportInfo.Description="T-49: listagem de vendas (UX-SPEC 2.3). Sem cores fixas: usa o padrao do FastReport (texto/linhas na cor padrao)." ReportInfo.Created="09/23/2026 00:00:00" ReportInfo.Modified="09/23/2026 00:00:00">
+  <Dictionary>
+    <Parameter Name="Titulo" DataType="System.String"/>
+    <Parameter Name="FiltroAplicado" DataType="System.String"/>
+    <Parameter Name="DataEmissao" DataType="System.String"/>
+    <Parameter Name="TotalListado" DataType="System.String"/>
+    <Parameter Name="NotaRodape" DataType="System.String"/>
+    <Parameter Name="MensagemVazia" DataType="System.String"/>
+  </Dictionary>
+  <ReportPage Name="Page1" Landscape="true" PaperWidth="297" PaperHeight="210" LeftMargin="10" TopMargin="10" RightMargin="10" BottomMargin="10">
+    <PageHeaderBand Name="PageHeader1" Width="1046.52" Height="75.6">
+      <TextObject Name="TxtTitulo" Width="756" Height="28.35" Text="[Titulo]" Font="Arial, 14pt, style=Bold"/>
+      <TextObject Name="TxtEmissao" Left="756" Width="290" Height="28.35" Text="Emitido em [DataEmissao]" HorzAlign="Right" Font="Arial, 10pt"/>
+      <TextObject Name="TxtFiltro" Top="30" Width="1046" Height="20" Text="[FiltroAplicado]" Font="Arial, 10pt"/>
+    </PageHeaderBand>
+    <ColumnHeaderBand Name="ColumnHeader1" Top="79.6" Width="1046.52" Height="22.68" Border.Lines="Bottom">
+      <TextObject Name="HVendaId" Width="120" Height="22.68" Text="VendaId" Font="Arial, 10pt, style=Bold"/>
+      <TextObject Name="HClienteId" Left="120" Width="130" Height="22.68" Text="ClienteId" Font="Arial, 10pt, style=Bold"/>
+      <TextObject Name="HValor" Left="250" Width="120" Height="22.68" Text="Valor (R$)" HorzAlign="Right" Font="Arial, 10pt, style=Bold"/>
+      <TextObject Name="HNulo" Left="370" Width="20" Height="22.68" Font="Arial, 10pt, style=Bold"/>
+      <TextObject Name="HStatus" Left="400" Width="120" Height="22.68" Text="Status" Font="Arial, 10pt, style=Bold"/>
+      <TextObject Name="HRecebida" Left="530" Width="170" Height="22.68" Text="Recebida" Font="Arial, 10pt, style=Bold"/>
+      <TextObject Name="HQuitada" Left="700" Width="170" Height="22.68" Text="Quitada" Font="Arial, 10pt, style=Bold"/>
+      <TextObject Name="HCancelada" Left="870" Width="170" Height="22.68" Text="Cancelada" Font="Arial, 10pt, style=Bold"/>
+    </ColumnHeaderBand>
+    <DataBand Name="Data1" Top="106.28" Width="1046.52" Height="20" DataSource="Linhas">
+      <TextObject Name="CVendaId" Width="120" Height="20" Text="[Linhas.VendaId]" Font="Arial, 9pt"/>
+      <TextObject Name="CClienteId" Left="120" Width="130" Height="20" Text="[Linhas.ClienteId]" Font="Arial, 9pt"/>
+      <TextObject Name="CValor" Left="250" Width="120" Height="20" Text="[Linhas.ValorTotal]" Format="Number" Format.UseLocale="false" Format.DecimalDigits="2" Format.DecimalSeparator="," Format.GroupSeparator="." Format.NegativePattern="1" HorzAlign="Right" Font="Arial, 9pt"/>
+      <TextObject Name="CNulo" Left="370" Width="20" Height="20" Text="[IIf([Linhas.ValorNulo], &quot;*&quot;, &quot;&quot;)]" Font="Arial, 9pt"/>
+      <TextObject Name="CStatus" Left="400" Width="120" Height="20" Text="[Linhas.Status]" Font="Arial, 9pt"/>
+      <TextObject Name="CRecebida" Left="530" Width="170" Height="20" Text="[Linhas.DataRecebimento]" Font="Arial, 9pt"/>
+      <TextObject Name="CQuitada" Left="700" Width="170" Height="20" Text="[Linhas.DataQuitacao]" Font="Arial, 9pt"/>
+      <TextObject Name="CCancelada" Left="870" Width="170" Height="20" Text="[Linhas.DataCancelamento]" Font="Arial, 9pt"/>
+    </DataBand>
+    <ReportSummaryBand Name="Summary1" Top="130.28" Width="1046.52" Height="80" Border.Lines="Top">
+      <TextObject Name="TxtVazio" Top="4" Width="1046" Height="20" Text="[MensagemVazia]" Font="Arial, 10pt, style=Italic"/>
+      <TextObject Name="TxtTotal" Top="28" Width="1046" Height="22.68" Text="Total listado: R$ [TotalListado]" Font="Arial, 11pt, style=Bold"/>
+      <TextObject Name="TxtNota" Top="54" Width="1046" Height="20" Text="[NotaRodape]" Font="Arial, 9pt"/>
+    </ReportSummaryBand>
+    <PageFooterBand Name="PageFooter1" Top="214.28" Width="1046.52" Height="20">
+      <TextObject Name="TxtPagina" Width="1046" Height="20" Text="Pagina [Page#] de [TotalPages#]" HorzAlign="Right" Font="Arial, 8pt"/>
+    </PageFooterBand>
+  </ReportPage>
+</Report>

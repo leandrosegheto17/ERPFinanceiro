@@ -1,6 +1,6 @@
 # SDD.md — ERP Financeiro (C#)
 
-> **RASCUNHO v0.1** — 21/09/2026. Autor: Coordenador (chapéu Software Architect). Base: `PRD-TECNICO.md` v0.2, `PRD.md`, `VISAO-PRODUTO.md`, `CTO-REVIEW.md`.
+> **APROVADO v0.1 (usuário, 22/09/2026).** Autor: Coordenador (chapéu Software Architect). Base: `PRD-TECNICO.md` v0.2, `PRD.md`, `VISAO-PRODUTO.md`, `CTO-REVIEW.md`.
 > Legenda: **[DECIDIDO]** decisão do usuário (D-01, D-02, D-07, D-09, stack) · **[A VALIDAR]** assumida com a recomendação do PRD-TECNICO (D-03, D-04, D-05, D-06, D-08, D-10, D-11, contrato v1.1 P-1…P-9). Se a validação divergir, gera novo ADR que supersede o atual.
 > O registro de mudanças do contrato (VISAO-PRODUTO 2.4) segue como fonte única. Este SDD **não** o altera; a linha v1.1 só é preenchida quando P-1…P-9 forem aceitas pelo Vendas.
 

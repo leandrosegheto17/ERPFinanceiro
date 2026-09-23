@@ -1,6 +1,6 @@
 # TASK.md — ERP Financeiro (C#)
 
-> **RASCUNHO v0.1 (Loop C, rodada 1)** — 21/09/2026. Autor: Coordenador (chapéu Tech Lead). Base: `SDD.md`, `UX-SPEC.md`, ADR 001-008, `PRD.md`, `PRD-TECNICO.md`, `VISAO-PRODUTO.md` (O-xx/S-xx, cronograma), `CTO-REVIEW.md`.
+> **APROVADO v0.1 (usuário, 22/09/2026).** Autor: Coordenador (chapéu Tech Lead). Base: `SDD.md`, `UX-SPEC.md`, ADR 001-008, `PRD.md`, `PRD-TECNICO.md`, `VISAO-PRODUTO.md` (O-xx/S-xx, cronograma), `CTO-REVIEW.md`.
 > SDD.md e UX-SPEC.md **não foram alterados**. Nenhuma tarefa exige decisão estrutural nova (ver Seção 6).
 > **Legenda de tier:** **[A]** obrigatório · **[B]** só se sobrar tempo (ordem de corte: de baixo para cima no Lote 14) · **[C]** fora do escopo (lista "estacionada" ao final da Seção 3).
 > **Status:** `A fazer` / `Em andamento` / `Bloqueada` / `Concluída` (atualizado pelo Executor). **Dono** = chapéu do Executor: `DB` (banco/SQL), `BE` (backend C#), `FE` (Desktop/DevExpress/FastReport), `DOC/OPS` (docs, build, empacotamento), `QA` (teste manual/integração).

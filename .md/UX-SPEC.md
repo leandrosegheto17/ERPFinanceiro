@@ -1,6 +1,6 @@
 # UX-SPEC.md — ERP Financeiro (C#)
 
-> **RASCUNHO v0.1** — 21/09/2026. Autor: Coordenador (chapéu UX/UI). Base: `PRD-TECNICO.md` (RF-06, RF-07, RF-08), `SDD.md` (limites técnicos).
+> **APROVADO v0.1 (usuário, 22/09/2026).** Autor: Coordenador (chapéu UX/UI). Base: `PRD-TECNICO.md` (RF-06, RF-07, RF-08), `SDD.md` (limites técnicos).
 > Aplicativo WinForms local para um operador; sem mockup de alta fidelidade. Wireframes em ASCII.
 > **Marcadores de tier** (escopo do PRD): **[A]** obrigatório · **[B]** só se sobrar tempo · **[C]** cai para evolução. A tela deve funcionar em [A] e crescer por camadas sem redesenho.
 > Itens **[A VALIDAR]** seguem as recomendações assumidas no SDD (D-03 pendente, D-08 cancelada sem quitação, D-10 cliente por ID).

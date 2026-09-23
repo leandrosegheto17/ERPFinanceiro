@@ -71,23 +71,23 @@ namespace ERPFinanceiro.Infrastructure.Persistencia
 
         /// <summary>
         /// Percorre a cadeia de <see cref="Exception.InnerException"/> até achar uma
-        /// <see cref="FbException"/> cuja mensagem indique violação de PRIMARY/UNIQUE KEY
-        /// envolvendo a constraint <c>UQ_FIN_VENDA_VENDA_ID</c> (database/01-schema.sql,
-        /// T-05). Firebird não expõe um código de erro público/estável específico para
-        /// "unique violation" na API gerenciada (<c>FbException.ErrorCode</c> carrega o
-        /// gds-code isc_* interno do provider, sem constante pública equivalente na versão
-        /// 10.3.4 usada aqui — verificado por reflexão contra o assembly do NuGet); a
-        /// mensagem padrão do engine ("violation of PRIMARY or UNIQUE KEY constraint...")
-        /// é o sinal estável documentado pelo próprio Firebird. Checar o nome da constraint
-        /// evita confundir com uma eventual UNIQUE diferente adicionada no futuro a outra
-        /// tabela do mesmo schema.
+        /// <see cref="FbException"/> que indique violação de PRIMARY/UNIQUE KEY envolvendo a
+        /// constraint <c>UQ_FIN_VENDA_VENDA_ID</c> (database/01-schema.sql, T-05).
+        /// Sinal primário, independente de idioma: <see cref="FbException.ErrorCode"/> ==
+        /// <see cref="IscUniqueKeyViolation"/> (gds 335544665, isc_unique_key_violation; o
+        /// provider 10.3.4 não tem constante nomeada em <c>IscCodes</c>) ou
+        /// <see cref="FbException.SQLSTATE"/> == <see cref="SqlStateIntegridade"/> ("23000",
+        /// classe integridade). O nome da constraint não é traduzido, então continua sendo
+        /// checado na mensagem para não confundir com outra UNIQUE do schema. Fallback: se
+        /// nenhum código bater, o texto em inglês do engine ("violation of PRIMARY or UNIQUE
+        /// KEY constraint...") ainda é aceito.
         /// </summary>
-        private static bool EhViolacaoDeUniqueVendaId(Exception excecao)
+        internal static bool EhViolacaoDeUniqueVendaId(Exception excecao)
         {
             for (var atual = excecao; atual != null; atual = atual.InnerException)
             {
                 var fbExcecao = atual as FbException;
-                if (fbExcecao != null && MensagemIndicaViolacaoDeUnique(fbExcecao.Message))
+                if (fbExcecao != null && IndicaViolacaoDeUniqueVendaId(fbExcecao))
                 {
                     return true;
                 }
@@ -96,13 +96,33 @@ namespace ERPFinanceiro.Infrastructure.Persistencia
             return false;
         }
 
-        private static bool MensagemIndicaViolacaoDeUnique(string mensagem)
+        private const int IscUniqueKeyViolation = 335544665;
+        private const string SqlStateIntegridade = "23000";
+
+        private static bool IndicaViolacaoDeUniqueVendaId(FbException fb)
         {
+            string mensagem = fb.Message;
             if (string.IsNullOrEmpty(mensagem))
             {
                 return false;
             }
 
+            bool ehConstraintDaVendaId = mensagem.IndexOf("UQ_FIN_VENDA_VENDA_ID", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!ehConstraintDaVendaId)
+            {
+                return false;
+            }
+
+            if (fb.ErrorCode == IscUniqueKeyViolation || fb.SQLSTATE == SqlStateIntegridade)
+            {
+                return true;
+            }
+
+            return MensagemIndicaViolacaoDeUnique(mensagem);
+        }
+
+        private static bool MensagemIndicaViolacaoDeUnique(string mensagem)
+        {
             bool ehViolacaoDeChave = mensagem.IndexOf("violation of PRIMARY or UNIQUE KEY constraint", StringComparison.OrdinalIgnoreCase) >= 0
                 || mensagem.IndexOf("violation of FOREIGN KEY constraint", StringComparison.OrdinalIgnoreCase) < 0
                    && mensagem.IndexOf("unique", StringComparison.OrdinalIgnoreCase) >= 0

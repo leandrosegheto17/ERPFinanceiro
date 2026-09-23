@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SDD 2.1: Infrastructure referencia Application e Domain. EF6 + Firebird aqui. -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>ERPFinanceiro.Infrastructure</RootNamespace>
+    <AssemblyName>ERPFinanceiro.Infrastructure</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ERPFinanceiro.Domain\ERPFinanceiro.Domain.csproj" />
+    <ProjectReference Include="..\ERPFinanceiro.Application\ERPFinanceiro.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Obrigatório (Seção 1, TASK.md; ADR-009): EF6 + provider Firebird. -->
+    <PackageReference Include="EntityFramework" Version="6.5.1" />
+    <PackageReference Include="EntityFramework.Firebird" Version="10.1.0" />
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ConfigurationManager (App.config) só é lido aqui, em ConfiguracaoBancoAppConfig (T-12). -->
+    <Reference Include="System.Configuration" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- T-12 (DbInitializer): schema embutido como Embedded Resource, fonte única em
+         database/01-schema.sql (sem cópia duplicada) — ver comentário em DbInitializer.cs. -->
+    <EmbeddedResource Include="..\..\database\01-schema.sql">
+      <Link>Persistencia\Schema\01-schema.sql</Link>
+      <LogicalName>ERPFinanceiro.Infrastructure.Persistencia.Schema._01_schema.sql</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

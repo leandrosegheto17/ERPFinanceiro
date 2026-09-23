@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SDD 2.1: Application referencia só Domain; sem EF/Web API/DevExpress (G-3/9). -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>ERPFinanceiro.Application</RootNamespace>
+    <AssemblyName>ERPFinanceiro.Application</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ERPFinanceiro.Domain\ERPFinanceiro.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

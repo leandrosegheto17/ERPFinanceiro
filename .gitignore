@@ -1,0 +1,29 @@
+# ERPFinanceiro.sln — ignore da solução (T-04)
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+.vs/
+
+# Banco Firebird real de execução local — NUNCA versionar .fdb de trabalho.
+# O .fdb de demonstração entregue em T-53 é exceção explícita (fica fora de src/).
+*.fdb
+*.fdb-shadow
+*.fdb.lock
+
+# Segredos locais: só o .example é versionado (G-6/24, GUARDRAILS.md)
+App.config
+!App.config.example
+
+# NÃO ignorar os scripts de schema/seed (regra 10, TASK.md Seção 1)
+!database/*.sql
+
+# Resultado de execução de teste (xUnit), não o código de teste em si
+TestResults/
+
+# Editor/OS
+.idea/
+*.DotSettings.user
+Thumbs.db

@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SDD 2.1: Desktop referencia Application, Reports, Api (só para hospedar o host OWIN) e
+       Infrastructure SOMENTE no composition root Autofac (G-3/9, nota SDD 2.1). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>ERPFinanceiro.Desktop</RootNamespace>
+    <AssemblyName>ERPFinanceiro.Desktop</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- T-27: ApiHostTests (ERPFinanceiro.Tests) precisa da sobrecarga interna
+         ApiHost.Start(int, Action<IAppBuilder>) para exercitar bind/estado sem depender
+         de controllers Web API reais (nenhum existe ainda — T-30+). -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>ERPFinanceiro.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ERPFinanceiro.Application\ERPFinanceiro.Application.csproj" />
+    <ProjectReference Include="..\ERPFinanceiro.Reports\ERPFinanceiro.Reports.csproj" />
+    <ProjectReference Include="..\ERPFinanceiro.Api\ERPFinanceiro.Api.csproj" />
+    <!-- Composition root Autofac (T-26): única referência permitida a Infrastructure fora dela mesma. -->
+    <ProjectReference Include="..\ERPFinanceiro.Infrastructure\ERPFinanceiro.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Autofac" Version="6.5.0" />
+    <!-- T-30: CompositionRoot.RegistrarControllersApi usa builder.RegisterApiControllers,
+         extensão de Autofac.Integration.WebApi — mesma versão do pacote já usado por
+         ERPFinanceiro.Api (T-25). Necessário para o AutofacWebApiDependencyResolver (T-27)
+         resolver a injeção por construtor dos controllers (ex. VendasController/T-30). -->
+    <PackageReference Include="Autofac.WebApi2" Version="6.1.1" />
+    <!-- T-27: WebApp.Start<Startup>(url) — auto-hospedagem OWIN do ApiHost. Mesma versão
+         do Microsoft.Owin.Host.HttpListener já usado por ERPFinanceiro.Api (T-25/ADR-004). -->
+    <PackageReference Include="Microsoft.Owin.Hosting" Version="4.2.2" />
+    <!-- DevExpress WinForms (trial) NÃO tem pacote no NuGet público (feed com licença própria,
+         nuget.devexpress.com) e não pôde ser instalado neste ambiente sandbox sem GUI/instalador
+         interativo (mesma limitação de T-02/docs/licencas.md). PackageReference intencionalmente
+         omitida aqui; adicionar quando houver acesso ao feed licenciado (T-41 em diante). -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="App.config.example">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ConfigurationManager (App.config): CompositionRoot (T-26) lê Api:Porta (repassada a
+         T-27) e Log:CaminhoArquivo (construtor de TraceLogger) diretamente daqui — mesma
+         exceção já documentada em ERPFinanceiro.Infrastructure.csproj para IConfiguracaoBanco
+         (ConfiguracaoBancoAppConfig continua sendo a única leitora de Banco:*). -->
+    <Reference Include="System.Configuration" />
+  </ItemGroup>
+
+</Project>

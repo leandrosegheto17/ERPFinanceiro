@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SDD 2.1: Api referencia Application (+ Domain só para os enums de status);
+       NUNCA referencia Infrastructure (G-3/9). Web API 2 sobre OWIN self-host. -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>ERPFinanceiro.Api</RootNamespace>
+    <AssemblyName>ERPFinanceiro.Api</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ERPFinanceiro.Domain\ERPFinanceiro.Domain.csproj" />
+    <ProjectReference Include="..\ERPFinanceiro.Application\ERPFinanceiro.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Obrigatório (Seção 1, TASK.md): Web API 2 + OWIN self-host, Autofac.WebApi2, Newtonsoft.Json. -->
+    <PackageReference Include="Microsoft.AspNet.WebApi.Owin" Version="5.3.0" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.3.0" />
+    <PackageReference Include="Microsoft.Owin.Host.HttpListener" Version="4.2.2" />
+    <PackageReference Include="Autofac" Version="6.5.0" />
+    <PackageReference Include="Autofac.WebApi2" Version="6.1.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>

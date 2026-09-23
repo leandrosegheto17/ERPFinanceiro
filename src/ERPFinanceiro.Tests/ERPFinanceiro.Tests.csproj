@@ -1,0 +1,91 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SDD 2.1, nota 5 do TASK.md Seção 6: Tests referencia Domain/Application/Infrastructure.
+       T-12 (DbInitializer) é teste de integração real contra Firebird embarcado (app fechado,
+       regra 11); T-20 (harness de concorrência com processos/Tasks) continua à parte. -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <IsPackable>false</IsPackable>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>ERPFinanceiro.Tests</RootNamespace>
+    <AssemblyName>ERPFinanceiro.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ERPFinanceiro.Domain\ERPFinanceiro.Domain.csproj" />
+    <ProjectReference Include="..\ERPFinanceiro.Application\ERPFinanceiro.Application.csproj" />
+    <ProjectReference Include="..\ERPFinanceiro.Infrastructure\ERPFinanceiro.Infrastructure.csproj" />
+    <!-- T-25: exercita ERPFinanceiro.Api.Startup.CriarConfiguracaoJson() diretamente. -->
+    <ProjectReference Include="..\ERPFinanceiro.Api\ERPFinanceiro.Api.csproj" />
+    <!-- T-26: exercita ERPFinanceiro.Desktop.CompositionRoot (builder.Build() + resolve). -->
+    <ProjectReference Include="..\ERPFinanceiro.Desktop\ERPFinanceiro.Desktop.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- D-11 (a validar): xUnit + Moq. -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <!-- T-12: teste de integração precisa do provider para montar a connection string/consultar RDB$. -->
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.4" />
+    <!-- T-26: CompositionRootTests resolve diretamente contra o IContainer (builder.Build()). -->
+    <PackageReference Include="Autofac" Version="6.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- RL4-02: desliga paralelização de assembly/coleção do xUnit (Firebird Embedded nativo
+         não é thread/processo-safe o suficiente sob a paralelização padrão — AccessViolationException
+         intermitente, achado do Validador no Lote 4). Precisa ser copiado para o bin/ de saída
+         para o runner realmente encontrar/ler o arquivo (não basta existir no projeto). -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- T-12: DLLs nativas do motor embarcado (não vêm no pacote NuGet gerenciado — ver
+         ADR-009 "Nota de infraestrutura"). Reaproveitadas do spike T-01 (mesmo pacote
+         Firebird-3.0.12.33787-0-x64), copiadas para o bin/ do Tests para o teste de
+         integração de DbInitializer conseguir abrir o motor embarcado via `dotnet test`.
+         Se o diretório do spike não existir localmente (build limpo sem ter rodado T-01
+         antes), estes itens simplesmente não copiam nada (Condition abaixo) — nesse caso
+         rode o teste manualmente após copiar as DLLs de
+         spikes/T-01-firebird-spike/FirebirdSpike/bin/Debug/net48/ para o bin/ deste projeto. -->
+    <!-- Só as DLLs realmente nativas (fbclient/fbembed e dependências C runtime/ICU) — de
+         propósito NÃO inclui EntityFramework*.dll/FirebirdSql.Data.FirebirdClient.dll/System.*.dll
+         do bin do spike, que são gerenciadas e já vêm via PackageReference/ProjectReference
+         acima (evita duas cópias/versões divergentes no bin/ do Tests). -->
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\fbclient.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\fbembed.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\ib_util.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\icudt52.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\icuin52.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\icuuc52.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\msvcp100.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\msvcr100.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\zlib1.dll"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\fbclient.dll')"
+          Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\*.dat"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48')"
+          Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\*.conf"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48')"
+          Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\firebird.msg"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\firebird.msg')"
+          Link="firebird.msg" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\plugins\*.*"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\plugins')"
+          Link="plugins\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\intl\*.*"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\intl')"
+          Link="intl\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+</Project>

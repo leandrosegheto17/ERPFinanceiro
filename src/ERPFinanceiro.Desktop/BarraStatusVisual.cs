@@ -104,20 +104,22 @@ namespace ERPFinanceiro.Desktop
         {
             _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
             Text = "Detalhes do status";
-            Size = new Size(560, 240);
+            AutoScaleMode = AutoScaleMode.Dpi; // T-51
+            Size = new Size(640, 420);
+            MinimumSize = new Size(640, 420);  // UX-SPEC 6 (diálogos)
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MinimizeBox = false;
             MaximizeBox = false;
             ShowInTaskbar = false;
 
-            _memo = new MemoEdit { Dock = DockStyle.Fill, AccessibleName = "Detalhes do status" };
+            _memo = new MemoEdit { Dock = DockStyle.Fill, AccessibleName = "Detalhes do status", AccessibleDescription = "Porta, caminho do banco e último erro. Somente leitura." };
             _memo.Properties.ReadOnly = true;
             _memo.Text = presenter.TextoDetalhes;
 
-            var btnCopiar = new SimpleButton { Text = "&Copiar", Size = new Size(100, 28), AccessibleName = "Copiar" };
+            var btnCopiar = new SimpleButton { Text = "&Copiar", Size = new Size(100, 28), AccessibleName = "Copiar", AccessibleDescription = "Copia os detalhes para a área de transferência." };
             btnCopiar.Click += (s, e) => Copiar();
-            var btnFechar = new SimpleButton { Text = "&Fechar", Size = new Size(100, 28), AccessibleName = "Fechar", DialogResult = DialogResult.Cancel };
+            var btnFechar = new SimpleButton { Text = "&Fechar", Size = new Size(100, 28), AccessibleName = "Fechar", AccessibleDescription = "Fecha o diálogo. Atalho: Esc.", DialogResult = DialogResult.Cancel };
 
             var rodape = new PanelControl { Dock = DockStyle.Bottom, Height = 44, BorderStyle = BorderStyles.NoBorder };
             btnCopiar.Location = new Point(10, 8);
@@ -128,6 +130,11 @@ namespace ERPFinanceiro.Desktop
             Controls.Add(_memo);
             Controls.Add(rodape);
             CancelButton = btnFechar;
+            _memo.TabIndex = 0;
+            rodape.TabIndex = 1;
+            btnCopiar.TabIndex = 0;
+            btnFechar.TabIndex = 1;
+            ActiveControl = btnCopiar;
         }
 
         internal string TextoExibido => _memo.Text;

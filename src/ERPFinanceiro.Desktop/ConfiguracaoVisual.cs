@@ -22,6 +22,12 @@ namespace ERPFinanceiro.Desktop
 
         private static bool _skinAplicada;
 
+        /// <summary>T-51 (UX-SPEC 5): declara o processo DPI-aware (DPI 125/150%). Chamar antes do primeiro Form.</summary>
+        public static void AplicarAcessibilidadeDpi()
+        {
+            DevExpress.XtraEditors.WindowsFormsSettings.SetDPIAware();
+        }
+
         /// <summary>Aplica a skin única da aplicação (idempotente). Chamar antes de criar qualquer Form.</summary>
         public static void AplicarSkin()
         {

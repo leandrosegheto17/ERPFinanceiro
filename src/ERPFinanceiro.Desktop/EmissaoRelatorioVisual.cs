@@ -36,10 +36,14 @@ namespace ERPFinanceiro.Desktop
                 Text = TextosRelatorio.Botao,
                 Size = new Size(150, 28),
                 Location = new Point(8, 6),
-                AccessibleName = "Emitir relatório"
+                AccessibleName = "Emitir relatório",
+                AccessibleDescription = "Gera o relatório financeiro com o filtro aplicado. Atalho: Alt+E.",
+                TabIndex = 0
             };
             _botao.Click += async (s, e) => await EmitirAsync();
             var painel = new PanelControl { Dock = DockStyle.Top, Height = 40, BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder };
+            painel.TabStop = false;
+            painel.TabIndex = 1; // T-51: após a grid (TabIndex 0 no host de FrmConsulta)
             painel.Controls.Add(_botao);
             _janela.Controls.Add(painel);
         }
@@ -113,6 +117,7 @@ namespace ERPFinanceiro.Desktop
             Text = TextosRelatorio.TituloDialogo;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
+            AutoScaleMode = AutoScaleMode.Dpi; // T-51
             ControlBox = false;
             MaximizeBox = MinimizeBox = false;
             ShowInTaskbar = false;
@@ -120,7 +125,7 @@ namespace ERPFinanceiro.Desktop
             KeyPreview = true;
 
             Progresso = new ProgressPanel { Caption = TextosRelatorio.Aguarde, Description = string.Empty, Location = new Point(20, 10), Size = new Size(260, 50), AccessibleName = TextosRelatorio.Aguarde };
-            BotaoCancelar = new SimpleButton { Text = "&" + TextosRelatorio.Cancelar, Location = new Point(100, 70), Size = new Size(100, 28), AccessibleName = TextosRelatorio.Cancelar };
+            BotaoCancelar = new SimpleButton { Text = "&" + TextosRelatorio.Cancelar, Location = new Point(100, 70), Size = new Size(100, 28), AccessibleName = TextosRelatorio.Cancelar, AccessibleDescription = "Cancela a geração do relatório. Atalho: Esc.", TabIndex = 0 };
             BotaoCancelar.Click += (s, e) => Cancelar();
             Controls.Add(Progresso);
             Controls.Add(BotaoCancelar);

@@ -19,6 +19,7 @@ namespace ERPFinanceiro.Desktop
         [STAThread]
         private static int Main()
         {
+            ConfiguracaoVisual.AplicarAcessibilidadeDpi(); // T-51: antes de qualquer janela/handle
             System.Windows.Forms.Application.EnableVisualStyles();
             System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
             ConfiguracaoVisual.AplicarSkin(); // RL9-02: antes do primeiro Form (splash incluso)

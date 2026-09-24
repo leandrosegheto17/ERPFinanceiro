@@ -190,11 +190,31 @@ namespace ERPFinanceiro.Desktop
             get
             {
                 var partes = new System.Collections.Generic.List<string>();
-                if (_api.UltimoErro != null) partes.Add("API: " + _api.UltimoErro.Message);
+                if (_api.UltimoErro != null) partes.Add("API: " + Sanitizar(_api.UltimoErro.Message));
                 var h = _ultimoHealth;
-                if (h != null && !h.Ok) partes.Add("Banco: " + h.Mensagem);
+                if (h != null && !h.Ok) partes.Add("Banco: " + Sanitizar(h.Mensagem));
                 return partes.Count == 0 ? "Nenhum erro registrado." : string.Join(Environment.NewLine, partes);
             }
+        }
+
+        private const int TamanhoMaximoMensagem = 500;
+
+        private static readonly System.Text.RegularExpressions.Regex SegredoRegex =
+            new System.Text.RegularExpressions.Regex(
+                @"\b(password|pwd|passwd|user\s*id|uid|user)\s*=\s*[^;\r\n]*",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>Defesa em profundidade (G-6): mascara credenciais estilo connection string e limita o tamanho.</summary>
+        internal static string Sanitizar(string mensagem)
+        {
+            if (string.IsNullOrEmpty(mensagem)) return mensagem ?? string.Empty;
+            string s = SegredoRegex.Replace(mensagem, m =>
+            {
+                int i = m.Value.IndexOf('=');
+                return m.Value.Substring(0, i + 1) + "***";
+            });
+            if (s.Length > TamanhoMaximoMensagem) s = s.Substring(0, TamanhoMaximoMensagem) + "...";
+            return s;
         }
 
         /// <summary>Texto do diálogo de detalhes (porta, caminho do .fdb, último erro) — também o texto copiado.</summary>

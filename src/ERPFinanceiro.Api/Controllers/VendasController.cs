@@ -45,13 +45,16 @@ namespace ERPFinanceiro.Api.Controllers
         private readonly ConsultaService _consultaService;
         private readonly CancelamentoService _cancelamentoService;
         private readonly ICorrelationContext _correlationContext;
+        private readonly RegistroService _registroService;
 
         public VendasController(
             QuitacaoService quitacaoService,
             ConsultaService consultaService,
             CancelamentoService cancelamentoService,
+            RegistroService registroService,
             ICorrelationContext correlationContext)
         {
+            _registroService = registroService ?? throw new ArgumentNullException(nameof(registroService));
             _quitacaoService = quitacaoService ?? throw new ArgumentNullException(nameof(quitacaoService));
             _consultaService = consultaService ?? throw new ArgumentNullException(nameof(consultaService));
             _cancelamentoService = cancelamentoService ?? throw new ArgumentNullException(nameof(cancelamentoService));
@@ -95,6 +98,39 @@ namespace ERPFinanceiro.Api.Controllers
             };
 
             return Ok(resposta);
+        }
+
+        /// <summary>
+        /// <c>POST /api/vendas</c> (contrato-v1.1.md Seção 3.4, T-62, D-03/P-9): registra
+        /// venda Pendente. Mesmo DTO de entrada da quitação. 200 <c>{status}</c> (criada
+        /// Pendente ou já existente: devolve o status atual, sem alterar, T-61). Payload
+        /// inválido -> 400 via <see cref="ValidacaoException"/>. Se D-03 for rejeitada,
+        /// remover esta action.
+        /// </summary>
+        [HttpPost]
+        [Route("")]
+        [Route("~/api/v1/vendas")]
+        public IHttpActionResult Registrar([FromBody] QuitacaoRequestDto dto)
+        {
+            var comando = new RegistrarVendaCommand
+            {
+                VendaId = dto?.VendaId,
+                ClienteId = dto?.ClienteId,
+                ValorTotal = dto?.ValorTotal ?? 0m,
+                Itens = dto?.Itens?
+                    .Select(item => new ItemVendaCommand
+                    {
+                        ProdutoId = item?.ProdutoId,
+                        Quantidade = item?.Quantidade ?? 0,
+                        PrecoUnitario = item?.PrecoUnitario ?? 0m
+                    })
+                    .ToList(),
+                CorrelationId = _correlationContext.CorrelationId
+            };
+
+            ResultadoRegistro resultado = _registroService.Registrar(comando);
+
+            return Ok(new RegistroResponseDto { Status = resultado.Status.ToString() });
         }
 
         /// <summary>

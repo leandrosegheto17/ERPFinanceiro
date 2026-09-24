@@ -40,7 +40,7 @@ namespace ERPFinanceiro.Desktop
             _itemApi.ItemClick += (s, e) => AoClicar();
             _itemBanco.ItemClick += (s, e) => AoClicar();
 
-            _presenter.Alterado += (s, e) => Refletir();
+            _presenter.Alterado += AoAlterado;
             Refletir();
         }
 
@@ -65,6 +65,16 @@ namespace ERPFinanceiro.Desktop
             return item;
         }
 
+        private bool _descartado;
+
+        /// <summary>RL10-02 (c): nada atualiza a UI depois de descartada; exceção de UI nunca vira "não observada".</summary>
+        internal void AoAlterado(object sender, EventArgs e)
+        {
+            if (_descartado) return;
+            try { Refletir(); }
+            catch (Exception) { /* UI já descartada (fechamento em curso): nada a atualizar */ }
+        }
+
         private void Refletir()
         {
             Aplicar(_itemApi, _presenter.Api);
@@ -80,7 +90,8 @@ namespace ERPFinanceiro.Desktop
         /// <summary>Clique em qualquer indicador: atualiza e abre o diálogo de detalhes.</summary>
         internal void AoClicar()
         {
-            var _ = _presenter.AtualizarAsync();
+            var _ = _presenter.AtualizarAsync().ContinueWith(t => { var __ = t.Exception; },
+                System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted); // observa a exceção
             using (var dialogo = new FrmDetalhesStatus(_presenter))
             {
                 dialogo.ShowDialog(_manager.Form as IWin32Window);
@@ -89,6 +100,8 @@ namespace ERPFinanceiro.Desktop
 
         public void Dispose()
         {
+            _descartado = true;
+            _presenter.Alterado -= AoAlterado;
             _presenter.Dispose();
             _manager.Dispose();
         }

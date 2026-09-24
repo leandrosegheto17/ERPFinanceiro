@@ -31,24 +31,24 @@ namespace ERPFinanceiro.Reports
         /// abre e imprime, mas o texto NAO e selecionavel/pesquisavel e o arquivo e grande (~250 KB a 1 MB
         /// por pagina). Fontes embutidas/texto vetorial so no PDF export do FastReport .NET comercial.
         /// </remarks>
-        public void Gerar(ResultadoRelatorioVendas resultado, string descricaoFiltro, DateTime emitidoEmLocal, Stream destino)
+        public void Gerar(ResultadoRelatorioVendas resultado, string descricaoFiltro, DateTime emitidoEmLocal, Stream destino, TotaisRelatorioVendas totais = null)
         {
             if (destino == null) throw new ArgumentNullException(nameof(destino));
-            Renderizar(resultado, descricaoFiltro, emitidoEmLocal, new PDFSimpleExport(), destino);
+            Renderizar(resultado, descricaoFiltro, emitidoEmLocal, new PDFSimpleExport(), destino, totais);
         }
 
         /// <summary>
         /// Mesma renderizacao exportada como HTML (texto real). Usada nos testes para assercao de
-        /// conteudo (o PDF do Open Source e raster, ver <see cref="Gerar(ResultadoRelatorioVendas,string,DateTime,Stream)"/>).
+        /// conteudo (o PDF do Open Source e raster, ver <see cref="Gerar(ResultadoRelatorioVendas,string,DateTime,Stream,TotaisRelatorioVendas)"/>).
         /// </summary>
-        public void GerarHtml(ResultadoRelatorioVendas resultado, string descricaoFiltro, DateTime emitidoEmLocal, Stream destino)
+        public void GerarHtml(ResultadoRelatorioVendas resultado, string descricaoFiltro, DateTime emitidoEmLocal, Stream destino, TotaisRelatorioVendas totais = null)
         {
             if (destino == null) throw new ArgumentNullException(nameof(destino));
-            Renderizar(resultado, descricaoFiltro, emitidoEmLocal, new FastReport.Export.Html.HTMLExport(), destino);
+            Renderizar(resultado, descricaoFiltro, emitidoEmLocal, new FastReport.Export.Html.HTMLExport(), destino, totais);
         }
 
         private static void Renderizar(ResultadoRelatorioVendas resultado, string descricaoFiltro, DateTime emitidoEmLocal,
-            FastReport.Export.ExportBase exportador, Stream destino)
+            FastReport.Export.ExportBase exportador, Stream destino, TotaisRelatorioVendas totais)
         {
             if (resultado == null) throw new ArgumentNullException(nameof(resultado));
 
@@ -85,6 +85,10 @@ namespace ERPFinanceiro.Reports
                 report.SetParameterValue("Filtro", descricaoFiltro ?? string.Empty);
                 report.SetParameterValue("EmitidoEm", emitidoEmLocal.ToString("dd/MM/yyyy HH:mm", FormatacaoRelatorio.PtBr));
                 report.SetParameterValue("TotalListado", FormatacaoRelatorio.Moeda(resultado.TotalListado));
+                // Totais por status (S-07, UX-SPEC 2.3): sem totais ou Pendente nulo (D-03 rejeitada/T-62 pendente) => linha vazia, encolhida pelo layout (CanShrink).
+                report.SetParameterValue("TotalQuitado", FormatacaoRelatorio.LinhaTotal("Total quitado:", totais?.Quitado));
+                report.SetParameterValue("TotalCancelado", FormatacaoRelatorio.LinhaTotal("Total cancelado:", totais?.Cancelado));
+                report.SetParameterValue("TotalPendente", FormatacaoRelatorio.LinhaTotal("Total pendente:", totais?.Pendente));
                 report.SetParameterValue("MensagemVazia", vazio ? TextoListaVazia : string.Empty);
                 report.SetParameterValue("NotaNulos", FormatacaoRelatorio.NotaNulos(resultado.QuantidadeSemValor));
 
@@ -94,11 +98,11 @@ namespace ERPFinanceiro.Reports
         }
 
         /// <summary>Gera o PDF em arquivo (sobrescreve).</summary>
-        public void Gerar(ResultadoRelatorioVendas resultado, string descricaoFiltro, DateTime emitidoEmLocal, string caminho)
+        public void Gerar(ResultadoRelatorioVendas resultado, string descricaoFiltro, DateTime emitidoEmLocal, string caminho, TotaisRelatorioVendas totais = null)
         {
             if (string.IsNullOrWhiteSpace(caminho)) throw new ArgumentException("Caminho obrigatório.", nameof(caminho));
             using (var fs = new FileStream(caminho, FileMode.Create, FileAccess.Write))
-                Gerar(resultado, descricaoFiltro, emitidoEmLocal, fs);
+                Gerar(resultado, descricaoFiltro, emitidoEmLocal, fs, totais);
         }
     }
 
@@ -127,6 +131,13 @@ namespace ERPFinanceiro.Reports
                 case StatusVenda.Cancelada: return "Cancelada";
                 default: throw new ArgumentOutOfRangeException(nameof(status), status, "StatusVenda não mapeado.");
             }
+        }
+
+        /// <summary>Linha "Total quitado:   R$ 12.500,00  (3 vendas)"; vazia quando o total é nulo (linha omitida).</summary>
+        public static string LinhaTotal(string rotulo, TotalPorStatus total)
+        {
+            if (total == null) return string.Empty;
+            return rotulo + "   R$ " + Moeda(total.Valor) + "  (" + total.Quantidade + (total.Quantidade == 1 ? " venda)" : " vendas)");
         }
 
         public static string Texto(string valor) => string.IsNullOrEmpty(valor) ? "—" : valor;

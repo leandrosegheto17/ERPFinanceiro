@@ -325,3 +325,23 @@
   execuções da suíte nesta máquina (e considerar fixá-la num script de teste do repositório).
 - Status: Contornado. Pendente a decisão de tornar o isolamento parte do repositório (script ou
   `runsettings`), para não depender de quem roda os testes.
+
+## Bloqueio 005 — 23/09/2026
+- Reportado por: orquestrador (`/executar lote 12`), ao recalcular a fila após T-51 fechar `Concluída`
+- Escalado para: usuário (orquestrador) — verificação manual que exige máquina com GUI e leitor de
+  tela; sem dono de artefato (não é problema de SDD.md/UX-SPEC.md/TASK.md)
+- Artefato/trecho afetado: `.md/TASK.md`, Lote 12, T-52 (e `docs/acessibilidade.md`, ainda não criado)
+- Descrição: **T-52** ("Verificação manual com Narrador: checklist de 8 itens do UX-SPEC 5,
+  resultado registrado em `docs/acessibilidade.md`") exige executar o app real e ouvir o Narrador do
+  Windows. O sandbox não tem display nem leitor de tela, então nenhum agente consegue marcar os 8
+  itens ok/nok com evidência real; preencher o checklist sem executar seria evidência fabricada.
+  Pendências manuais acumuladas de T-51 que entram no mesmo checklist: DPI 125/150% real, Tab/
+  Shift+Tab ao vivo e foco visível, contraste renderizado/alto contraste, leitura no Narrador,
+  `SetDPIAware` no `Main` (só por inspeção).
+- Impacto se não resolvido: Lote 12 não fecha (T-52 `A fazer`); T-53 (Lote 13, empacotamento)
+  depende de T-52 (Seção 4 do TASK.md). T-51 está `Concluída`, verificada por código (234/234).
+- Sugestão: (a) o usuário executa o checklist de 8 itens do UX-SPEC 5 numa máquina com GUI e
+  registra o resultado (o executor pode gerar antes o esqueleto de `docs/acessibilidade.md` para
+  preenchimento manual); (b) aceitar T-52 como pendência manual explícita e seguir para
+  `/validar` do Lote 12; (c) redefinir T-52 com o Coordenador.
+- Status: Aberto

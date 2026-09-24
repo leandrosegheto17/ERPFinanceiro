@@ -36,6 +36,7 @@ namespace ERPFinanceiro.Desktop
             _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
             _linha = linha ?? throw new ArgumentNullException(nameof(linha));
 
+            AutoScaleMode = AutoScaleMode.Dpi; // T-51
             Size = new Size(720, 460);
             MinimumSize = new Size(640, 420);
             StartPosition = FormStartPosition.CenterParent;
@@ -96,6 +97,28 @@ namespace ERPFinanceiro.Desktop
             Controls.Add(rodape);
             Controls.Add(topo);
 
+            // T-51: Tab explícito (itens -> Tentar novamente -> Fechar); Esc fecha via CancelButton.
+            _grid.AccessibleName = "Itens da venda";
+            _grid.AccessibleDescription = "Itens da venda selecionada, somente leitura.";
+            _abas.AccessibleName = "Abas da venda";
+            _abaItens.AccessibleName = "Itens";
+            _progresso.AccessibleName = "Carregando itens";
+            _lblAviso.AccessibleName = "Aviso dos itens";
+            _lblTotal.AccessibleName = "Total dos itens";
+            _lblTitulo.AccessibleName = "Título da venda";
+            _btnTentar.AccessibleName = "Tentar novamente";
+            _btnTentar.AccessibleDescription = "Carrega novamente os itens da venda.";
+            _btnFechar.AccessibleName = "Fechar";
+            _btnFechar.AccessibleDescription = "Fecha os detalhes e volta à lista. Atalho: Esc.";
+            _abas.TabIndex = 0;
+            _grid.TabIndex = 0;
+            _btnTentar.TabIndex = 1;
+            rodape.TabIndex = 1;
+            _btnFechar.TabIndex = 0;
+            topo.TabIndex = 2;
+            topo.TabStop = false;
+            ActiveControl = _grid;
+
             AplicarCabecalho(CabecalhoDetalheVenda.De(_linha));
             Text = "Venda " + _linha.VendaId;
             Shown += (s, e) => Carregar();
@@ -113,6 +136,9 @@ namespace ERPFinanceiro.Desktop
         internal bool CarregandoVisivel => _progressoVisivel;
         internal int QuantidadeAbas => _abas.TabPages.Count;
         internal IButtonControl BotaoFechar => _btnFechar;
+        internal GridControl Grid => _grid;
+        internal SimpleButton BotaoTentar => _btnTentar;
+        internal SimpleButton BotaoFecharControle => _btnFechar;
 
         private void AplicarCabecalho(CabecalhoDetalheVenda c)
         {

@@ -54,7 +54,9 @@ namespace ERPFinanceiro.Desktop
             _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
 
             Text = "ERP Financeiro - Consulta de Vendas";
+            AutoScaleMode = AutoScaleMode.Dpi; // T-51: DPI 125/150% (UX-SPEC 5)
             Size = new Size(1024, 600);
+            MinimumSize = new Size(1024, 600); // UX-SPEC 6
             KeyPreview = true;
 
             _icones = ConfiguracaoVisual.CriarIconesStatus();
@@ -67,8 +69,10 @@ namespace ERPFinanceiro.Desktop
 
             _lblContador = CriarRotulo(DockStyle.Right, HorzAlignment.Far, "0 vendas");
             _lblContador.Width = 140;
+            _lblContador.AccessibleName = "Contador de vendas";
             _lblLegenda = CriarRotulo(DockStyle.Left, HorzAlignment.Near, "* Cancelada sem quitação registrada: sem cliente/valor (\"—\").");
             _lblLegenda.Width = 700;
+            _lblLegenda.AccessibleName = "Legenda da lista";
             var rodape = new PanelControl { Dock = DockStyle.Bottom, Height = 28, BorderStyle = BorderStyles.NoBorder };
             _lblAviso = CriarRotulo(DockStyle.Fill, HorzAlignment.Center, string.Empty);
             _lblAviso.AccessibleName = "Aviso de limite de linhas";
@@ -103,10 +107,23 @@ namespace ERPFinanceiro.Desktop
             Controls.Add(host);
             Controls.Add(rodape);
 
-            KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.F5) { e.Handled = true; Recarregar(); }
-            };
+            // T-51: ordem de Tab explícita (UX-SPEC 5): grid -> "Tentar novamente" -> Emitir relatório (TabIndex 1,
+            // definido em EmissaoRelatorioVisual) -> rodapé. Rótulos não recebem foco.
+            _grid.AccessibleName = "Lista de vendas";
+            _grid.AccessibleDescription = "Vendas registradas. Enter abre os detalhes da venda; F5 atualiza; F2 abre os detalhes do status.";
+            _grid.TabIndex = 0;
+            _painelErro.TabIndex = 1;
+            _progresso.TabIndex = 2;
+            _painelErro.AccessibleName = "Erro ao consultar";
+            _btnTentar.AccessibleDescription = "Consulta novamente o banco de dados.";
+            _btnTentar.TabIndex = 0;
+            host.TabIndex = 0;
+            host.TabStop = false;
+            rodape.TabIndex = 2;
+            rodape.TabStop = false;
+            ActiveControl = _grid; // foco inicial na grid (UX-SPEC 5, [A])
+
+            KeyDown += (s, e) => TratarTecla(e);
             Shown += (s, e) => Recarregar();
 
             // T-44: duplo clique / Enter na linha abre F-3.
@@ -115,10 +132,20 @@ namespace ERPFinanceiro.Desktop
                 var info = _view.CalcHitInfo(_grid.PointToClient(Control.MousePosition));
                 if (info.InRow) AbrirDetalhe();
             };
-            _grid.KeyDown += (s, e) =>
-            {
-                if (e.KeyCode == Keys.Enter) { e.Handled = true; AbrirDetalhe(); }
-            };
+            _grid.KeyDown += (s, e) => TratarTeclaGrid(e);
+        }
+
+        /// <summary>T-51: atalhos da janela. F5 atualiza; F2 abre os detalhes do status (RL10-01: caminho por teclado do BarStaticItem).</summary>
+        internal void TratarTecla(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.F5) { e.Handled = true; Recarregar(); }
+            else if (e.KeyCode == Keys.F2 && e.Modifiers == Keys.None) { e.Handled = true; _barraStatus?.AoClicar(); }
+        }
+
+        /// <summary>Enter na grid abre F-3 (T-44).</summary>
+        internal void TratarTeclaGrid(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter) { e.Handled = true; AbrirDetalhe(); }
         }
 
         private static LabelControl CriarRotulo(DockStyle dock, HorzAlignment horizontal, string texto)
@@ -159,6 +186,7 @@ namespace ERPFinanceiro.Desktop
         }
 
         internal GridControl Grid => _grid;
+        internal SimpleButton BotaoTentar => _btnTentar;
         internal GridView View => _view;
         internal string TextoContador => _lblContador.Text;
 

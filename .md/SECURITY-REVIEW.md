@@ -881,3 +881,525 @@ que a correção resolve o risco funcional sem reabrir a política RT-08/regra
 fundo (design e segurança) e não constitui achado, dada a garantia
 arquitetural de processo único já ratificada pelo ADR-004. Não exige reabrir
 o `coordenador`. Lote 6 fecha **Validado** (sem ressalvas).
+
+## Lote 7 — Endpoints (marco: API utilizável pelo Vendas)
+
+**Veredito: Aprovado, sem débito de segurança.** Auditoria disparada só após
+o chapéu QA aprovar funcionalmente este lote (`QA-REPORT.md`: Lote 7 =
+Aprovado, sem ressalvas). Base: `SDD.md` Seção 7, `GUARDRAILS.md` G-21/G-22/
+G-24, `docs/contrato-v1.1.md` Seção 3.1-3.3.
+
+### `static-security-analysis`
+
+- Escopo real do `git diff` do lote: `VendasController.cs` (3 actions e 6
+  atributos `[Route]`), `VendaStatusResponseDto.cs`,
+  `CancelamentoRequestDto.cs`, `CancelamentoResponseDto.cs`,
+  `docs/postman/smoke-vendas.sh`+`README.md`, `tools/T-34-smoke-harness/`
+  (harness descartável, não parte da `.sln`). `QuitacaoRequestDto.cs`/
+  `QuitacaoResponseDto.cs` (T-30) não foram tocados nesta worktree — herdados
+  do commit-base, mesma auditoria de superfície de código aplicada.
+- Sem SQL concatenado em nenhum artefato novo: as 3 actions do controller
+  não tocam banco diretamente, delegam para `QuitacaoService`/
+  `ConsultaService`/`CancelamentoService` (Application, já auditados nos
+  Lotes 4/5) — nenhuma query nova introduzida por este lote.
+- Nenhum `PackageReference` fora da lista obrigatória da Seção 1 introduzido
+  pelos projetos de produção (`Api`) neste lote — confirmado no
+  `ERPFinanceiro.Api.csproj` (sem diff). O harness de T-34
+  (`tools/T-34-smoke-harness/T34SmokeHarness.csproj`) é código descartável
+  fora da `.sln`, mesma disciplina de `spikes/T-01-firebird-spike/`, já
+  aceita em lotes anteriores — referenciado só para rodar a smoke suite, não
+  compõe o build de produção nem é distribuído.
+- `Cancelamento(dto)`: a exceção lançada para `vendaId` ausente/vazio
+  (`Application.Exceptions.ValidacaoException`) é a mesma classe já mapeada
+  por `ExceptionParaRespostaMapper` (T-28, Lote 6, não alterado neste lote) —
+  confirmado que nenhuma nova branch de tratamento de exceção foi adicionada
+  ao mapper; o roteamento para 400 reaproveita o `case` já existente
+  (`ApplicationExceptions.ValidacaoException`, adicionado em T-18/Lote 5).
+
+### `security-requirement-validation`
+
+- **Envelope de erro nunca vaza stack trace/mensagem de exceção original
+  (ponto de atenção pedido nesta rodada)**: confirmado que
+  `GlobalExceptionHandler.cs`/`ExceptionParaRespostaMapper.cs` **não
+  aparecem no `git diff` deste lote** — reaproveitados sem nenhuma
+  modificação pelas 3 novas actions. Testei manualmente o pior caso possível
+  introduzido por este lote: se `CancelamentoService.Cancelar` lançar
+  `ArgumentException` (guarda defensiva interna, T-19/Lote 5) por algum
+  caminho que escape da validação do controller, ela cai no `case default`
+  do mapper -> 500 `ERRO_INTERNO` com mensagem genérica fixa, nunca
+  `ex.Message`/stack trace — confirmado por leitura do `case default`, sem
+  achado. Todas as respostas HTTP 400/404/409 observadas nos testes de
+  integração deste lote usam mensagens de negócio estáveis e não sensíveis
+  (`"O campo 'vendaId' é obrigatório."`, `"Cancelar uma venda quitada exige
+  o campo 'motivo'."`, etc.), nenhuma delas ecoa dado bruto não sanitizado
+  do payload do cliente.
+- **`X-Api-Key`/credenciais não antecipadas incorretamente**: confirmado por
+  busca no `git diff` e nos 3 arquivos novos de controller/DTOs — nenhuma
+  referência a `X-Api-Key`/`ApiKey`/autenticação em `VendasController.cs`
+  nem nos DTOs deste lote. As 3 actions permanecem sem autenticação,
+  exatamente como o escopo do lote define (T-35 é Lote 8, ainda `A fazer`) —
+  não há bypass nem antecipação incorreta de controle de acesso.
+- **Validação de payload no controller para `Cancelamento` (ponto de atenção
+  pedido nesta rodada), avaliada sob a ótica de segurança**: a decisão de
+  validar `vendaId` ausente/vazio diretamente no controller, em vez de
+  estender `ValidadorVendaCommand` (T-17), não introduz risco — é uma
+  validação de presença simples (`string.IsNullOrWhiteSpace`), sem lógica de
+  negócio sensível, e produz exatamente o código/mensagem do contrato (400
+  `PAYLOAD_INVALIDO`). Não há caminho onde essa decisão pontual permita um
+  payload malformado/malicioso passar sem validação: a dupla guarda
+  (controller + `ArgumentException` defensivo no serviço) garante que
+  `vendaId` nulo/vazio nunca alcança a camada de persistência. Avaliação:
+  **decisão pontual aceitável, não um achado de segurança** — mesmo
+  enquadramento do ponto de atenção sobre `Startup.Container` avaliado no
+  Lote 6 (limitação real e contida, não um desvio de política).
+- **`App.config`/credenciais de desenvolvimento fora do controle de
+  versão**: confirmado por mim (não só pela nota do Executor) via `git
+  status`/`git check-ignore -v`:
+  `src/ERPFinanceiro.Tests/App.config` → `.gitignore:17:App.config` (match,
+  ignorado); `tools/T-34-smoke-harness/App.config` → mesmo match, ignorado
+  (aparece em `git status --ignored` como `!!`, nunca `??`). Os `.example`
+  correspondentes (`tools/T-34-smoke-harness/App.config.example`) têm só
+  placeholders (`Api:ApiKey = "CHAVE_LOCAL_SMOKE_T34"`, `Banco:Senha =
+  "masterkey"` — a senha padrão de desenvolvimento do Firebird embarcado,
+  já aceita como não-segredo real nos Lotes 1-6, mesmo valor usado em todo
+  `App.config.example` do repositório) — nenhum segredo real versionado.
+  `docs/postman/` (README + script + evidência) não contém nenhuma
+  credencial, só `vendaId`s sintéticos com sufixo timestamp.
+
+### `compliance-validation`
+
+Não aplicável neste lote — mesmo enquadramento dos Lotes 2-6 (`vendaId`/
+`clienteId`/`produtoId`/`motivo` seguem identificadores/textos técnicos
+opacos nos DTOs deste lote, sem PII nova introduzida). LGPD segue baixo
+impacto (CTO-REVIEW item 5, já registrado).
+
+### `sensitive-data-exposure-check`
+
+- Nenhuma resposta HTTP das 3 actions deste lote expõe dado além do previsto
+  pelo contrato (`status`, `dataQuitacao`, `vendaId`) — confirmado por
+  leitura dos 3 DTOs de saída e pelos corpos JSON observados nos testes de
+  integração reexecutados por mim.
+- `smoke-vendas.sh`/evidência de execução (`docs/postman/`): usam só dados
+  sintéticos (`V-SMOKE-*`, `C-SMOKE-1`, produtos `P-01`/`P-02`) — nenhum
+  dado real de cliente/venda, confirmado por leitura do script completo.
+- `tools/T-34-smoke-harness/App.config.example`: placeholder de `ApiKey`
+  claramente marcado como local/smoke (`CHAVE_LOCAL_SMOKE_T34`), não um
+  valor que poderia ser confundido com produção.
+
+### `finding-severity-classification`
+
+| Achado | Severidade | Bloqueia deploy? | Encaminhamento |
+|---|---|---|---|
+| Nenhum achado de segurança neste lote | — | — | — |
+
+Nenhuma entrada nova nesta tabela. Os dois pontos de atenção pedidos
+(validação de `vendaId` no controller de `Cancelamento`; reaproveitamento do
+envelope de erro sem alteração) foram avaliados e não constituem achado —
+ver `security-requirement-validation` acima.
+
+### Requisitos de segurança operacional para o chapéu DevOps
+
+- Nenhum requisito novo além dos já registrados nos Lotes 3-6. Reforço
+  específico deste lote: quando T-35 (`ApiKeyHandler`, Lote 8) entrar no
+  pipeline, as 3 rotas deste lote (`quitacao`/`{vendaId}/status`/
+  `cancelamento`, nas duas bases `/api/vendas` e `/api/v1/vendas`, 6 rotas
+  no total) precisam estar todas cobertas pela checagem de `X-Api-Key` — o
+  `DelegatingHandler` já é registrado no pipeline OWIN antes do roteamento
+  de controller (mesmo padrão de `CorrelationIdHandler`/`GlobalExceptionHandler`,
+  já corretamente ordenados), então isso deve valer automaticamente para as
+  6 rotas sem trabalho adicional; confirmar isso explicitamente na auditoria
+  do Lote 8 (T-35/T-37).
+
+### Relevância estratégica (sinalização ao Gestor)
+
+Nenhum achado com relevância estratégica de segurança/compliance neste lote.
+
+## Fechamento estrutural do lote (checagem do próprio Validador) — Lote 7
+
+1. **Todas as tarefas `Concluída`**: confirmado — T-30, T-31, T-32, T-33,
+   T-34 (Seção 3, Lote 7 do `TASK.md`) estão `Concluída`.
+2. **Dependências da Seção 4 relativas ao Lote 7**: T-30 dep.
+   T-18/T-25/T-26/T-28/T-29 (Lotes 5/6) — satisfeitas; T-31 dep.
+   T-24/T-25/T-26/T-28 — satisfeitas; T-32 dep. T-19/T-25/T-26/T-28/T-29 —
+   satisfeitas; T-33 dep. T-30/T-31/T-32 (mesmo lote) — satisfeita; T-34 dep.
+   T-30/T-31/T-32 (mesmo lote) — satisfeita. Tarefas de lotes futuros que
+   dependem deste lote: T-35 dep. T-25/T-28/T-26 (não deste lote, ok); T-36
+   dep. T-22/T-25/T-26 (não deste lote, ok); T-37 dep. T-34/T-35 — T-34
+   `Concluída`, T-35 `A fazer` (esperado, Lote 8 ainda não iniciado); T-38
+   dep. T-30/T-31/T-35/T-36/T-03 — T-30/T-31/T-03 `Concluída`, T-35/T-36 `A
+   fazer` (esperado); T-62 (Tier B, Lote 14) dep. T-61/T-30 — T-30
+   `Concluída`, T-61 ainda não chegou (esperado, tier/lote muito posterior).
+   Todas as referências apontam corretamente para tarefas `Concluída` deste
+   lote e de lotes anteriores já validados, ou para tarefas futuras ainda
+   `A fazer` de forma consistente com o cronograma — sem referência quebrada,
+   confirmado por leitura direta da Seção 3/4 do `TASK.md`.
+3. **Nenhuma tarefa `Bloqueada`**: confirmado (`BLOCKERS.md` só tem o
+   Bloqueio 001, já "Resolvido (parcialmente)", nota operacional de
+   ambiente — e nem sequer reproduzido nesta rodada de validação, suíte
+   completa verde na 1ª tentativa).
+4. **Achados simples/débito baixo-médio → `Refatoração Lote-7`**: não
+   aplicável — zero achados nesta rodada (QA e DevSecOps). `Refatoração
+   Lote-7` não é criado (mesmo critério já usado nos Lotes 2/3/6).
+
+**Conclusão: consistente, sem inconsistência que exija redesenho de
+dependência/decomposição.** Os dois pontos de atenção pedidos (validação de
+`vendaId` no controller de `Cancelamento`; reaproveitamento do envelope de
+erro sem alteração) foram avaliados a fundo e não constituem achado. Não
+exige reabrir o `coordenador`. Lote 7 fecha **Validado** (sem ressalvas) —
+marco "API utilizável pelo Vendas" cumprido: os 3 endpoints do contrato v1.0
+(quitação, cancelamento, status) estão implementados, testados de ponta a
+ponta contra Firebird real, com alias `/api/v1` e coleção de fumaça
+disponível em `docs/postman/`.
+
+## Lote 8 — Segurança da API e integração real (Dia 4)
+
+**Veredito: Aprovado, sem débito de segurança.** Auditoria disparada só após
+o chapéu QA aprovar funcionalmente este lote (`QA-REPORT.md`: Lote 8 =
+Aprovado, sem ressalvas). Base: `SDD.md` Seção 7, `GUARDRAILS.md` G-6.24 (chave
+nunca logada)/G-21/G-22/G-24, `docs/contrato-v1.1.md` Seções 2/3.1-3.5,
+ADR-010.
+
+### `static-security-analysis`
+
+- Escopo real do `git diff` do lote: `ApiKeyHandler.cs` (novo),
+  `HealthController.cs` (novo), `Dtos/HealthResponseDto.cs` (novo),
+  `Startup.cs` (adição de `ConfigurarApiKey`), `docs/contrato-v1.1.md`
+  (ajuste de 4 mensagens), `docs/postman/smoke-vendas.sh`/`README.md`
+  (adição de `X-Api-Key`/cenários 401), `tools/T-38-integracao-simulada/`,
+  `tools/T-39-integracao-simulada/` (harnesses descartáveis, fora da
+  `.sln`), `docs/integracao-simulada/` (evidência/README/pendência).
+- Nenhum `PackageReference` novo introduzido em projeto de produção
+  (`Api`) — `ApiKeyHandler` usa só `System.Configuration` (já referenciado
+  desde T-25/nota de camada documentada) e BCL (`System.Security.Cryptography`
+  não foi usado — decisão correta, dado que a API necessária não existe no
+  net48; a alternativa manual foi escolhida e revisada abaixo).
+- Sem SQL concatenado em nenhum artefato novo deste lote — `HealthController`
+  delega a `IHealthService` (já auditado T-22); `ApiKeyHandler` não toca
+  banco.
+- Harnesses `tools/T-38.../T-39...` seguem a mesma disciplina já aceita
+  (`tools/T-34-smoke-harness`, Lote 7): fora da `.sln`, `App.config` real
+  gitignorado, `.example` só com placeholders de desenvolvimento.
+
+### `security-requirement-validation`
+
+- **Comparação em tempo constante (S-08) — revisão criptográfica manual**:
+  `ComparacaoEmTempoConstante` percorre sempre `Math.Max(len(esperada),
+  len(recebida))` bytes, nunca retorna cedo (nem por diferença de tamanho —
+  incorporada ao acumulador via XOR antes do laço —, nem por diferença de
+  conteúdo — o `|=` acumula sem `break`/`return` dentro do laço). Único
+  desvio de uma implementação de referência: usa XOR acumulado num `int`
+  (0 se e só se todos os bytes comparados forem iguais **e** os tamanhos
+  forem iguais) em vez de comparar `byte` a `byte` num único acumulador de
+  `byte` — equivalente em segurança (a extensão do tamanho para `int` não
+  introduz vazamento de timing adicional, o laço já é O(max(len)) fixo, sem
+  branch dependente de dado dentro do loop). **Avaliação: criptograficamente
+  aceitável** para o nível de ameaça deste componente (defesa contra timing
+  attack de rede, não um HMAC/assinatura). Sem achado.
+- **Fail-closed confirmado por leitura e por raciocínio de caso extremo**:
+  `ChaveValida` retorna `false` sempre que `ObterChaveConfigurada()` é nulo
+  ou vazio, **antes** de sequer olhar o header da requisição — nenhum
+  caminho onde ausência de configuração vira "todas as chaves aceitas" ou
+  "todas rejeitadas menos uma vazia coincidente" (o `IsNullOrEmpty` explícito
+  elimina o caso "header também vazio bate com config vazia"). Comportamento
+  correto de fail-closed, sem achado.
+- **Chave nunca em log/exceção**: confirmado por leitura completa de
+  `ApiKeyHandler.cs` — nenhuma variável que contenha a chave recebida ou
+  configurada é passada a `IAppLogger.Registrar`, interpolada em mensagem,
+  ou anexada a uma exceção lançada. A única mensagem de log é a constante
+  fixa da classe. Sem achado.
+- **401 idêntico para ausente/inválida**: confirmado — mesmo método
+  `ConstruirRespostaNaoAutorizada` para os dois ramos de `SendAsync`
+  (`EstaIsenta(request) || ChaveValida(request)` sendo falso cai sempre no
+  mesmo caminho, sem branch que distinga "ausente" de "errada"). Reforça
+  contra enumeração de credencial válida por diferença de resposta. Sem
+  achado.
+- **Ordem de registro no pipeline OWIN**: `ConfigurarApiKey` roda depois de
+  `ConfigurarCorrelationId` e antes de `ConfigurarExceptionHandler`
+  (`Startup.Configuration`) — como `DelegatingHandler`s em
+  `config.MessageHandlers`, ambos rodam **antes** do roteamento de
+  controller (mecanismo do próprio Web API 2), então nenhuma rota
+  autenticável escapa da checagem, incluindo as 6 rotas de venda (3
+  endpoints x 2 bases, alias `/api/v1`, T-33) — reforço específico pedido no
+  `SECURITY-REVIEW.md` do Lote 7, **confirmado satisfeito** por leitura do
+  pipeline e pelos testes de integração reexecutados (nenhuma rota de venda
+  respondeu sem 401 na ausência de `X-Api-Key`, na suíte completa). Isenção
+  de `/api/health` corretamente restrita a essa única rota — comparação por
+  `AbsolutePath` não usa prefixo/`StartsWith`, então não isenta acidentalmente
+  nenhuma rota de venda que comece com algo parecido.
+- **`GET /api/health` de fato não autentica**: confirmado por leitura —
+  `HealthController` não lê nenhum header, nenhuma configuração de chave;
+  toda a lógica de isenção vive só no `ApiKeyHandler` (sem duplicação nem
+  bypass paralelo). Comportamento esperado por P-5 (health check não deve
+  exigir credencial, para monitoramento externo).
+
+### `compliance-validation`
+
+Não aplicável neste lote — mesmo enquadramento dos Lotes 2-7 (nenhum dado
+pessoal novo introduzido; `X-Api-Key` é segredo operacional, não dado
+pessoal). LGPD segue baixo impacto (CTO-REVIEW item 5, já registrado).
+
+### `sensitive-data-exposure-check`
+
+- Resposta 401 do `ApiKeyHandler`: corpo fixo (`{erro:{codigo:"NAO_AUTORIZADO",
+  mensagem:"..."}}`, string constante) — não ecoa o header recebido nem
+  nenhum dado do request. Confirmado.
+- Arquivo de log real (`Log:CaminhoArquivo`) lido diretamente pelo teste
+  dedicado de T-35 (`ApiHostVendasApiKeyControllerTests`) e reexecutado por
+  mim como parte da suíte completa — inspecionei o teste (não o arquivo de
+  log gerado, que fica fora do repositório) e confirmei que a asserção
+  (`Assert.DoesNotContain`) cobre tanto a chave correta quanto a errada.
+- `App.config.example` dos 2 novos harnesses (`tools/T-38-integracao-simulada/`,
+  `tools/T-39-integracao-simulada/`): só placeholders de desenvolvimento
+  (`CHAVE_LOCAL_SIMULADA_T38`/`T39`, `SYSDBA`/`masterkey` — senha padrão do
+  Firebird embarcado, já aceita como não-segredo real em todos os lotes
+  anteriores) — nenhum segredo real versionado, confirmado por leitura linha
+  a linha dos 2 arquivos `.example`.
+- `App.config` reais (T-35/T-38/T-39, além do já existente de T-32/Lote 7)
+  confirmados fora do controle de versão por mim mesmo (não só pela nota do
+  Executor): `git check-ignore -v src/ERPFinanceiro.Tests/App.config
+  tools/T-38-integracao-simulada/App.config tools/T-39-integracao-simulada/App.config
+  tools/T-34-smoke-harness/App.config` — os 4 batem com `.gitignore:17:App.config`;
+  `git status --short` sobre `tools/`/`docs/integracao-simulada/`/
+  `docs/postman/` mostra só `??` (não rastreado) nos diretórios novos, sem
+  nenhum `App.config` real listado — confirma que nada de segredo local
+  vazou para o índice do git.
+- `docs/integracao-simulada/evidencia-execucao-T-38.txt`/`T-39.txt`:
+  confirmado por leitura que os únicos "segredos" impressos são as chaves de
+  desenvolvimento (`CHAVE_LOCAL_SIMULADA_T38`/`T39`, já classificadas acima
+  como não-segredo real) — sem CPF/dado pessoal/credencial de produção.
+
+### `finding-severity-classification`
+
+| Achado | Severidade | Bloqueia deploy? | Encaminhamento |
+|---|---|---|---|
+| Nenhum achado de segurança neste lote | — | — | — |
+
+Nenhuma entrada nova nesta tabela. A comparação em tempo constante manual
+(ausência de `CryptographicOperations.FixedTimeEquals` no net48) foi avaliada
+a fundo em `security-requirement-validation` acima e considerada
+criptograficamente aceitável — não é um achado, é uma limitação de
+plataforma já documentada e mitigada corretamente pelo Executor.
+
+### Requisitos de segurança operacional para o chapéu DevOps
+
+- `Api:ApiKey` real de produção deve ser gerada com entropia suficiente
+  (não reaproveitar `CHAVE_LOCAL_TESTE_T32`/`CHAVE_LOCAL_SMOKE_T34`/
+  `CHAVE_LOCAL_SIMULADA_T38`/`T39`, todas exclusivas de desenvolvimento/teste)
+  e armazenada fora do `App.config` versionável, conforme já orientado nos
+  Lotes 4/6 (gestão de secrets, T-53/empacotamento não deve incluir `ApiKey`
+  real — já é critério de aceite explícito de T-53 na Seção 3 do `TASK.md`).
+- Rotação de `Api:ApiKey`: como a comparação é simples (chave única, sem
+  hashing/salting), qualquer rotação exige reiniciar o processo Desktop
+  (chave lida uma vez por requisição via `ConfigurationManager`, mas o
+  `App.config` só é relido se o processo reiniciar/o AppDomain recarregar) —
+  registrar esse comportamento no runbook operacional se rotação em
+  produção for um requisito (não coberto pelo `SDD.md` atual; sinalização
+  preventiva, não um achado bloqueante deste lote).
+- Observabilidade: tentativas 401 já geram uma linha de log genérica
+  (`TraceLogger`/T-21) — suficiente para detectar tentativa de acesso
+  indevido em volume, sem exigir infraestrutura nova.
+
+### Relevância estratégica (sinalização ao Gestor)
+
+Nenhum achado de segurança com relevância estratégica neste lote. A
+pendência de integração real com o Vendas/Delphi (ADR-010, `BLOCKERS.md`
+Bloqueio 002) já foi sinalizada ao usuário pelo Coordenador antes da
+execução deste lote — não é um achado novo desta auditoria, só confirmado
+como corretamente rotulado em toda a evidência produzida (ver
+`QA-REPORT.md`, seção T-38/T-39).
+
+## Fechamento estrutural do lote (checagem do próprio Validador) — Lote 8
+
+1. **Todas as tarefas `Concluída`**: confirmado — T-35, T-36, T-37, T-38,
+   T-39, T-40 (Seção 3, Lote 8 do `TASK.md`) estão `Concluída`.
+2. **Dependências da Seção 4 relativas ao Lote 8**: T-35 dep.
+   T-25/T-28/T-26 (Lote 6) — satisfeitas; T-36 dep. T-22/T-25/T-26 (Lotes
+   4/6) — satisfeitas; T-37 dep. T-34/T-35 (Lote 7 + mesmo lote) —
+   satisfeitas; T-38 dep. T-30/T-31/T-35/T-36 (Lote 7 + mesmo lote) —
+   satisfeitas; T-39 dep. T-38/T-32 (mesmo lote + Lote 7) — satisfeitas;
+   T-40 dep. T-39 (mesmo lote) — satisfeita. Tarefa futura que depende deste
+   lote: T-53 (Lote 13) dep. T-40/T-50/T-52 — T-40 `Concluída` (T-50/T-52
+   ainda não chegaram, esperado, tiers/lotes posteriores). Confirmado por
+   leitura direta da Seção 4.1/4.2 do `TASK.md` (nota do Bloqueio 002/ADR-010:
+   "nenhuma tarefa dos Lotes 9, 10, 11 ou 12 depende de T-38/T-39/T-40") que
+   nenhum outro lote em andamento (9/10, paralelos a este) referencia
+   nenhuma tarefa deste lote — sem referência quebrada.
+3. **Nenhuma tarefa `Bloqueada`**: confirmado — `BLOCKERS.md` tem o Bloqueio
+   001 (operacional, "Resolvido (parcialmente)", não reproduzido nesta
+   validação: suíte completa 124/124 em 2 rodadas, sem `FileLoadException`)
+   e o Bloqueio 002, cujo status é **"Resolvido (redesenho de escopo)"** —
+   confirmado que T-38 **não está mais `Bloqueada`** no `TASK.md` (estava
+   citada como bloqueada só na descrição histórica do Bloqueio 002, nunca
+   chegou a ter `Status: Bloqueada` na Seção 3 — a linha da tarefa já nasceu
+   redefinida e foi direto para `Concluída` após a decisão do Coordenador).
+   **Checagem do `BLOCKERS.md` (pedida explicitamente para este lote)**: o
+   registro do Bloqueio 002 é coerente — contexto, decisão do Coordenador
+   (com referência ao ADR-010), atualização de 23/09/2026 (T-40) linkando
+   `docs/integracao-simulada/PENDENCIA-INTEGRACAO-REAL.md`, e status final
+   "Resolvido (redesenho de escopo) — pendência residual... permanece
+   aberta" — a pendência residual está clara e não foi apagada/escondida
+   pelo fechamento do bloqueio; não reaberto por esta validação (correto,
+   nada de novo a acrescentar).
+4. **Achados simples/débito baixo-médio → `Refatoração Lote-8`**: não
+   aplicável — zero achados nesta rodada (QA e DevSecOps). `Refatoração
+   Lote-8` não é criado (mesmo critério já usado nos Lotes 2/3/6/7).
+
+**Conclusão: consistente, sem inconsistência que exija redesenho de
+dependência/decomposição.** A redefinição de escopo de T-38/T-39 (ADR-010)
+já foi decidida e aprovada antes desta validação — não é reaberta aqui, só
+confirmada como corretamente executada e rotulada. Não exige reabrir o
+`coordenador`. Lote 8 fecha **Validado** (sem ressalvas). Marco "O-11"
+(Dia 4) cumprido nos termos do ADR-010: suíte de integração simulada verde;
+integração real com o Vendas (Delphi) permanece pendência externa explícita,
+documentada e não apresentada como concluída em nenhum artefato do lote.
+
+## Lote 9 — Tela de consulta: grid e detalhe
+
+**Veredito: Aprovado com débito baixo (documentação).** Nenhum achado
+alto/crítico; nenhum compliance obrigatório em aberto. Auditados os arquivos
+novos/alterados de `src/ERPFinanceiro.Desktop` (Formatadores, ConfiguracaoVisual,
+ConsultaVendasModelo, FrmConsulta, DetalheVendaModelo, FrmDetalheVenda),
+`Desktop.csproj`/`Tests.csproj` e `docs/licencas.md`, depois da aprovação do
+chapéu QA (`QA-REPORT.md`, Lote 9: Aprovado com ressalvas).
+
+### `static-security-analysis`
+- Sem `.Result`/`.Wait()`, SQL, `Process.Start` ou desserialização no código de
+  tela; a única entrada é o `VendaId` da linha do grid, repassado a
+  `ConsultaService` (parametrizado no repositório, auditado em lotes
+  anteriores).
+- `DbContext` por operação: escopo Autofac novo por carga (regra 5/RT-08),
+  nunca compartilhado — confirmado.
+- Cor `#555555` hardcoded nos SVGs: qualidade, não segurança (RL9-01).
+
+### `sensitive-data-exposure-check`
+- **Erros na tela:** `FrmConsulta` e `FrmDetalheVenda` usam `catch (Exception)`
+  que **descarta** a exceção e mostra mensagem fixa. Sem `ex.Message`,
+  `ToString()` ou `StackTrace` em `src/ERPFinanceiro.Desktop` (grep). Nenhum
+  caminho de `.fdb` exibido. Observação: a exceção é descartada sem log (o
+  "detalhe técnico no log" fica com T-45/T-46); sem impacto de segurança.
+- **Segredos:** nenhuma ApiKey, senha de banco ou connection string em código
+  de tela.
+- **Licença/artefatos:** nenhum `DevExpress_License.txt`/chave/`licenses.licx`
+  versionado ou na árvore (só `LICENSE.txt` de skills do `.claude`,
+  pré-existentes). `git status` sem artefato indevido.
+
+### `finding-severity-classification` — dependência nova
+`DevExpress.Win.Grid` 25.1.9 (nuget.org público, **trial 30 dias**, warnings
+DX1000/DX1001). Origem oficial, versão fixa; risco principal é
+**licenciamento/entrega**, não vulnerabilidade.
+- **RL9-04 (baixo, documentação):** `docs/licencas.md` (T-02) ainda diz que o
+  DevExpress "não foi possível instalar" — **desatualizado** após o Bloqueio
+  003 (23/09/2026). Deve registrar: (a) pacotes vêm do **nuget.org público em
+  trial de 30 dias** (início do relógio via NuGet não confirmado); (b) em modo
+  evaluation vale **"Redistribution prohibited"** (aviso DX1000): o build
+  compilado com o trial **não pode ser redistribuído/entregue** sem licença —
+  **relevante para T-53 (empacotamento/entrega, Lote 13)**; (c) splash/marca
+  d'água de trial persistem até licenciar. Prazo: antes de T-53.
+
+### Requisitos de segurança operacional para o chapéu DevOps
+Acrescentar ao checklist de T-53: confirmar licença DevExpress/FastReport
+válida antes de gerar o pacote de entrega (não distribuir build trial).
+
+### Relevância estratégica (sinalização ao Gestor)
+Sim, baixa urgência: a proibição de redistribuição em modo trial e o prazo de
+30 dias é decisão de custo/licenciamento (G-2 "custo zero") que pode conflitar
+com a entrega final. Sinalizado ao Gestor, sem bloquear este lote.
+
+## Fechamento estrutural do lote (checagem do próprio Validador) — Lote 9
+
+1. **Tarefas `Concluída`:** T-41, T-42, T-43, T-44 — confirmado.
+2. **Dependências da Seção 4:** T-41 dep. T-04; T-42 dep. T-23/T-26/T-41; T-43
+   dep. T-42; T-44 dep. T-24/T-42 — satisfeitas. Dependentes futuros (T-45/
+   T-46/T-47, T-50, T-51) apontam para T-42/T-44 `Concluída`: sem referência
+   quebrada.
+3. **Nenhuma tarefa `Bloqueada`:** confirmado. `BLOCKERS.md` Bloqueio 003
+   "Resolvido (parcialmente)" com a verificação visual manual clara; não
+   reaberto.
+4. **Dependência esperada, não inconsistência:** as telas só funcionam de fato
+   com o composition root (`Program.cs`, T-46); `DetalhePresenter` só é
+   atribuída ali. Estava só na nota de T-44, não em T-46/T-51 -> RL9-02.
+5. **`Refatoração Lote-9` criada** (RL9-01…RL9-04, fim da Seção 3 do
+   `TASK.md`). Sem inconsistência que exija redesenho: sem escalonamento ao
+   `coordenador`. Lote 9 fecha **Validado com ressalvas**.
+
+## Lote 10 — Tela: status e ciclo de vida
+
+**Veredito: Aprovado com débito baixo.** Nenhum achado alto/crítico; nenhum
+compliance obrigatório em aberto. Auditados os arquivos novos/alterados de
+`src/ERPFinanceiro.Desktop` (barra, inicialização, mutex, encerramento,
+composição), `docs/licencas.md` e csproj, depois da aprovação do chapéu QA
+(`QA-REPORT.md`, Lote 10: Aprovado com ressalvas).
+
+### `static-security-analysis`
+- Sem `.Result`/`.Wait()`, SQL, `Process.Start` ou desserialização. Sem entrada
+  externa nova: a tela lê estado em processo (`IHealthService`,
+  `ApiHost.Estado`); nenhum listener/porta novo (o `ApiHost` extra do
+  `ComposicaoJanelaPrincipal` nunca faz `Start`).
+- Mutex `Global\ERPFinanceiro.Desktop.InstanciaUnica`: nome fixo, sem segredo;
+  escopo `Global\` é o desejado (um `.fdb` por máquina, regra 11). Sem ACL
+  explícita: outro usuário pode receber `UnauthorizedAccessException`
+  (disponibilidade/UX, RL10-03). Reserva do nome por processo local hostil
+  (DoS local) fica fora do modelo de ameaça do projeto; sem tarefa.
+
+### `sensitive-data-exposure-check`
+- **Mensagens ao usuário:** splash, aviso, diálogo de API e confirmação sem
+  caminho de arquivo nem stack. `Program` mostra `ex.Message` só de config
+  (nome de chave, sem valor). Estados de erro de F-1/F-3 seguem com mensagem
+  fixa.
+- **Diálogo de detalhes:** expõe porta e caminho do `.fdb` de propósito
+  (UX-SPEC). "Último erro"/Copiar usa `ex.Message` cru de `HealthService`/
+  `HttpListenerException`. `HealthService` monta a connection string (com
+  `Password`) mas só propaga `ex.Message`; as mensagens do FbClient (caminho,
+  I/O, "user name and password are not defined") **não ecoam a senha**
+  (análise de código; não provoquei todos os erros possíveis). Sem vazamento
+  comprovado, mas sem barreira: débito baixo de defesa em profundidade
+  (**RL10-04**).
+- **`IAppLogger`:** `Program` registra `contexto + ": " + ex` (exceção
+  completa) só no arquivo de log local; nenhuma ApiKey, senha ou connection
+  string no código do Desktop além de `CompositionRoot` (uso legítimo, grep
+  `ApiKey|Senha|Password`).
+- **Licenças/artefatos:** nenhum `DevExpress_License.txt`, `licenses.licx` ou
+  chave versionados; csproj só com `PackageReference` 25.1.9 do nuget.org.
+
+### `finding-severity-classification`
+| Achado | Severidade | Destino |
+|---|---|---|
+| "Último erro" copiável sem sanitização (sem segredo hoje) | Baixa | RL10-04 |
+| Mutex sem tratamento de acesso negado / multiusuário | Baixa | RL10-03 |
+| Sem handlers de exceção não tratada; falhas do encerramento perdidas | Baixa | RL10-02 |
+| Intermitência de teste (Lote 8, Firebird embarcado) | Baixa (qualidade) | RL10-06 |
+
+### RL9-04 (`docs/licencas.md`) — resolvido
+Confere com os fatos: nuget.org público, `DevExpress.Win.Grid` 25.1.9, avisos
+DX1000 ("Redistribution prohibited") e DX1001, trial de 30 dias com **início
+do relógio no modo NuGet explicitamente "não confirmado"**, splash/marca
+d'água persistentes, pendência visual RL1-03 marcada honestamente, checklist
+objetivo de T-53 (licença válida ou decisão explícita do usuário antes de
+empacotar) e nota ao Gestor sobre o conflito com G-2. Sem afirmação de
+verificação não feita. **Fechado.**
+
+### Requisitos de segurança operacional para o chapéu DevOps
+Sem novos. Mantém o item de T-53 (licença DevExpress/FastReport válida antes
+do pacote de entrega).
+
+### Relevância estratégica (sinalização ao Gestor)
+Sem novidade em relação ao Lote 9 (conflito G-2 x proibição de redistribuir o
+trial; já sinalizado). Sem bloqueio.
+
+## Fechamento estrutural do lote (checagem do próprio Validador) — Lote 10
+
+1. **Tarefas `Concluída`:** T-45, T-46, T-47 — confirmado.
+2. **Dependências da Seção 4:** T-45 dep. T-22/T-27/T-42; T-46 dep.
+   T-12/T-27/T-42; T-47 dep. T-46 — satisfeitas. T-51 depende de
+   T-45/T-46/T-47 (coerente). **T-50 não depende de T-45/T-46/T-47** (Dep. =
+   T-42, T-49): não é inconsistência (o fluxo do relatório não usa barra nem
+   inicialização); só diverge da expectativa do pedido. T-48 `Concluída`;
+   T-49/T-50 `A fazer` com Dep. válidas. Lote 12 (T-51/T-52) coerente. Sem
+   referência quebrada.
+3. **Nenhuma tarefa `Bloqueada`:** confirmado. `BLOCKERS.md` Bloqueio 003
+   segue "Resolvido (parcialmente)" com a verificação visual manual do usuário.
+4. **RL9-01 `Em andamento`** (esperado); RL9-02/03/04 `Concluída` e conferidas.
+5. **`Refatoração Lote-10` criada** (RL10-01…RL10-06, fim da Seção 3 do
+   `TASK.md`). Sem inconsistência que exija redesenho: sem escalonamento ao
+   `coordenador`. Lote 10 fecha **Validado com ressalvas**, com a conferência
+   visual/ao vivo do usuário pendente.

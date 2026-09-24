@@ -1,0 +1,277 @@
+# Evidência de execução real — T-39 (23/09/2026)
+#
+# ============================================================================
+# SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi).
+# Este documento registra a execução de um harness HTTP (papel do "Vendas")
+# contra a API local, não uma integração com o sistema Vendas em Delphi real.
+# Ver ADR-010 (.md/adr/010-integracao-vendas-simulada-sem-acesso-delphi.md) e
+# .md/BLOCKERS.md Bloqueio 002. A integração real com o Vendas permanece
+# pendência externa explícita, fora do alcance deste sandbox.
+# ============================================================================
+#
+# App local real: ApiHost + Startup + CompositionRoot.Construir() (mesmo caminho de produção de
+# T-26/T-27/T-30/T-31/T-32/T-35/T-36/T-37) subido por um harness dedicado a T-39
+# (tools/T-39-integracao-simulada/), reaproveitando o mesmo padrão de tools/T-38-integracao-
+# simulada/ (T-38) e tools/T-34-smoke-harness/ (T-34/T-37) — não é a mesma instância física, é um
+# novo pequeno console descartável seguindo a mesma disciplina (não faz parte da
+# ERPFinanceiro.sln), que dispara as chamadas via HttpClient real (papel do Vendas) e consulta o
+# Firebird diretamente (VendaRepository/FinanceiroDbContext) para confirmar objetivamente a
+# ausência de novo histórico no reenvio pós-timeout (P-2) — o HTTP por si só não expõe o histórico
+# da venda, então a checagem em banco é necessária para o critério de aceite "sem duplicar
+# histórico" (não é suficiente inferir isso só pela resposta HTTP).
+#
+# Cobertura desta evidência (critério de aceite de T-39, docs/contrato-v1.1.md Seção 3.2):
+#   1. Cancelamento de venda Pendente -> 200 {status:"Cancelada"}.
+#   2. Cancelamento de venda desconhecida -> 200 {status:"Cancelada"} (cria+cancela, D-08).
+#   3. Cancelamento de venda Quitada sem motivo -> 409 {erro:{codigo:"MOTIVO_OBRIGATORIO"}} (D-06).
+#   4. Reenvio após timeout (idempotência, P-2): mesmo payload do cenário 1 reenviado sobre a
+#      venda já Cancelada -> mesmo resultado (200 Cancelada), contagem de VendaHistorico
+#      confirmada inalterada por consulta direta ao banco (antes/depois do reenvio).
+#   5a. Erro 400: payload inválido (vendaId ausente) -> {erro:{codigo:"PAYLOAD_INVALIDO"}}.
+#   5b. Erro 401: sem X-Api-Key -> {erro:{codigo:"NAO_AUTORIZADO"}}.
+#   5c. Erro 401: X-Api-Key errada -> {erro:{codigo:"NAO_AUTORIZADO"}}, corpo idêntico ao 5b
+#       (nenhuma distinção revelada ao chamador, T-35).
+#
+# Seed de dados: venda Pendente e venda Quitada semeadas diretamente no banco real antes de subir
+# a API (mesma técnica de ApiHostVendasCancelamentoControllerTests/T-32 — não há endpoint público
+# de "registrar Pendente" implementado nesta sessão, POST /api/vendas é T-62/Tier B condicional).
+# Venda desconhecida (cenário 2) não é semeada — o próprio harness a referencia sem que ela exista.
+#
+# Firebird 3.0 embarcado real (mesmas DLLs nativas usadas pelos testes de integração de
+# T-30/T-31/T-32 e pelos harnesses de T-34/T-37/T-38 nesta worktree — fbclient.dll/fbembed.dll/
+# plugins//intl/, copiadas de src/ERPFinanceiro.Tests/bin/Debug/net48). Build do harness
+# (`dotnet build`) feito de dentro do worktree (OneDrive) sem erro; execução do binário
+# (T39IntegracaoSimulada.exe) feita fora do OneDrive (C:\temp_erp_t39\net48), mesmo contorno do
+# Bloqueio 001 (BLOCKERS.md). Porta 5039 (dedicada, distinta de 5038 usada por T-38), banco
+# dedicado C:\ERPFinanceiro\data\financeiro_t39_simulado.fdb (apagado e recriado a cada execução
+# do harness, estado limpo por execução). X-Api-Key: CHAVE_LOCAL_SIMULADA_T39 (App.config local do
+# harness, gitignorado — só o .example é versionado, mesma convenção de T-04/T-34/T-38).
+#
+# Cada cenário abaixo foi de fato EXECUTADO (Diretriz 16 da Seção 1 do TASK.md — evidência de
+# execução real, não inspeção estática), 2 vezes seguidas contra 2 instâncias novas e limpas do
+# harness (vendaId único por execução, timestamp), ambas 8/8 verificações OK.
+
+═══════════════════════════════════════════════════════════════════════════════
+EXECUÇÃO 1/2
+═══════════════════════════════════════════════════════════════════════════════
+
+================================================================================
+[T39] SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi). Harness HTTP fazendo o papel do Vendas contra a API local (ADR-010).
+================================================================================
+[T39] Inicializando banco (.fdb) via DbInitializer...
+[T39] API ATIVA em http://localhost:5039/ (papel do Vendas simulado por este harness)
+
+--- Cenário: 1. Cancelamento — venda Pendente (motivo opcional, ausente) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T39
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-PEND-1790182799"}
+2026-09-23T17:00:00.3102794Z [7b5bdd0b-0143-45fd-8096-cad910397250] Cancelamento processado para venda 'V-T39-SIM-PEND-1790182799' (status resultante: Cancelada).
+RESPONSE:
+  HTTP 200
+  Body: {"status":"Cancelada"}
+   [OK] HTTP 200, status=Cancelada.
+   [DB]  Consulta direta ao banco (VendaHistorico) apos cenario 1: 2 registro(s).
+
+--- Cenário: 2. Cancelamento — venda desconhecida (cria+cancela, D-08) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T39
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-DESC-1790182799","motivo":"Cliente desistiu da compra"}
+2026-09-23T17:00:00.4373070Z [f2aa0897-c468-4db1-88d8-2104b0bd9c81] Cancelamento processado para venda 'V-T39-SIM-DESC-1790182799' (status resultante: Cancelada).
+RESPONSE:
+  HTTP 200
+  Body: {"status":"Cancelada"}
+   [OK] HTTP 200, status=Cancelada (venda criada já Cancelada).
+
+--- Cenário: 3. Cancelamento — venda Quitada sem motivo (D-06) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T39
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-QUIT-1790182799"}
+2026-09-23T17:00:00.4839618Z [] ERPFinanceiro.Domain.Exceptions.MotivoObrigatorioException: Motivo do cancelamento é obrigatório. (stack trace suprimido nesta cópia — ver execução 2/2 abaixo para o rastreio completo; ambas idênticas em codigo/HTTP status)
+RESPONSE:
+  HTTP 409
+  Body: {"erro":{"codigo":"MOTIVO_OBRIGATORIO","mensagem":"Motivo do cancelamento é obrigatório."}}
+   [OK] HTTP 409, erro.codigo=MOTIVO_OBRIGATORIO.
+
+--- Cenário: 4. Reenvio pós-timeout — mesmo payload do cenário 1 (idempotência P-2) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T39
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-PEND-1790182799"}
+2026-09-23T17:00:00.5240467Z [c860461b-05c4-49cb-9eef-6706e653fcbc] Cancelamento processado para venda 'V-T39-SIM-PEND-1790182799' (status resultante: Cancelada).
+RESPONSE:
+  HTTP 200
+  Body: {"status":"Cancelada"}
+   [OK] HTTP 200, status=Cancelada (mesmo resultado do cenário 1, reenvio idempotente).
+   [DB]  Consulta direta ao banco (VendaHistorico) apos reenvio: 2 registro(s) (antes do reenvio: 2).
+   [OK] Contagem de VendaHistorico inalterada (2 -> 2) — reenvio pós-timeout NAO gerou novo histórico (P-2 confirmado por consulta direta ao banco).
+
+--- Cenário: 5a. Payload inválido — vendaId ausente (400) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T39
+  Content-Type: application/json
+  Body: {"motivo":"sem vendaId"}
+2026-09-23T17:00:00.5636219Z [] ERPFinanceiro.Application.Exceptions.ValidacaoException: O campo 'vendaId' é obrigatório. (stack trace suprimido nesta cópia)
+RESPONSE:
+  HTTP 400
+  Body: {"erro":{"codigo":"PAYLOAD_INVALIDO","mensagem":"O campo 'vendaId' é obrigatório."}}
+   [OK] HTTP 400, erro.codigo=PAYLOAD_INVALIDO.
+
+--- Cenário: 5b. Sem X-Api-Key (401) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: (ausente)
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-PEND-1790182799"}
+2026-09-23T17:00:00.5663728Z [cd565bdf-9273-4cd3-8b77-047f3b069468] Requisição rejeitada: X-Api-Key ausente ou inválida.
+RESPONSE:
+  HTTP 401
+  Body: {"erro":{"codigo":"NAO_AUTORIZADO","mensagem":"Credencial de acesso ausente ou inválida."}}
+   [OK] HTTP 401, erro.codigo=NAO_AUTORIZADO (header ausente).
+
+--- Cenário: 5c. X-Api-Key errada (401) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_ERRADA_T39
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-PEND-1790182799"}
+2026-09-23T17:00:00.5673712Z [78e85882-3ac2-4a73-993e-9735214d20fa] Requisição rejeitada: X-Api-Key ausente ou inválida.
+RESPONSE:
+  HTTP 401
+  Body: {"erro":{"codigo":"NAO_AUTORIZADO","mensagem":"Credencial de acesso ausente ou inválida."}}
+   [OK] HTTP 401, erro.codigo=NAO_AUTORIZADO (chave inválida).
+   [OK] Corpo do 401 idêntico nos dois casos (sem header / chave errada) — nenhuma distinção revelada ao chamador (T-35).
+
+================================================================================
+[T39] Resultado: 8/8 verificações OK.
+[T39] SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi). Harness HTTP fazendo o papel do Vendas contra a API local (ADR-010).
+================================================================================
+
+═══════════════════════════════════════════════════════════════════════════════
+EXECUÇÃO 2/2
+═══════════════════════════════════════════════════════════════════════════════
+
+================================================================================
+[T39] SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi). Harness HTTP fazendo o papel do Vendas contra a API local (ADR-010).
+================================================================================
+[T39] Inicializando banco (.fdb) via DbInitializer...
+[T39] API ATIVA em http://localhost:5039/ (papel do Vendas simulado por este harness)
+
+--- Cenário: 1. Cancelamento — venda Pendente (motivo opcional, ausente) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T39
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-PEND-1790182803"}
+2026-09-23T17:00:04.4287668Z [109a96d9-58af-4beb-a64d-290d52e8abc0] Cancelamento processado para venda 'V-T39-SIM-PEND-1790182803' (status resultante: Cancelada).
+RESPONSE:
+  HTTP 200
+  Body: {"status":"Cancelada"}
+   [OK] HTTP 200, status=Cancelada.
+   [DB]  Consulta direta ao banco (VendaHistorico) apos cenario 1: 2 registro(s).
+
+--- Cenário: 2. Cancelamento — venda desconhecida (cria+cancela, D-08) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T39
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-DESC-1790182803","motivo":"Cliente desistiu da compra"}
+2026-09-23T17:00:04.5525546Z [38176274-af4b-455a-b6c8-61ede140f546] Cancelamento processado para venda 'V-T39-SIM-DESC-1790182803' (status resultante: Cancelada).
+RESPONSE:
+  HTTP 200
+  Body: {"status":"Cancelada"}
+   [OK] HTTP 200, status=Cancelada (venda criada já Cancelada).
+
+--- Cenário: 3. Cancelamento — venda Quitada sem motivo (D-06) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T39
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-QUIT-1790182803"}
+2026-09-23T17:00:04.6021499Z [] ERPFinanceiro.Domain.Exceptions.MotivoObrigatorioException: Motivo do cancelamento é obrigatório.
+   em ERPFinanceiro.Domain.Entities.Venda.Cancelar(DateTime dataCancelamentoUtc, String motivo, String correlationId) na C:\Users\leand\OneDrive\Projetos\Cartsys\ERPFinanceiro\.claude\worktrees\execucao+executar-lote7\src\ERPFinanceiro.Domain\Entities\Venda.cs:linha 272
+   em ERPFinanceiro.Application.Servicos.CancelamentoService.CancelarInterno(IVendaRepository repositorio, IUnitOfWork unitOfWork, CancelarVendaCommand comando) na C:\Users\leand\OneDrive\Projetos\Cartsys\ERPFinanceiro\.claude\worktrees\execucao+executar-lote7\src\ERPFinanceiro.Application\Servicos\CancelamentoService.cs:linha 119
+   em ERPFinanceiro.Application.Servicos.CancelamentoService.<>c__DisplayClass4_0.<Cancelar>b__0() na C:\Users\leand\OneDrive\Projetos\Cartsys\ERPFinanceiro\.claude\worktrees\execucao+executar-lote7\src\ERPFinanceiro.Application\Servicos\CancelamentoService.cs:linha 87
+   em ERPFinanceiro.Application.Servicos.ExecutorComRetry.Executar[T](Func`1 operacao) na C:\Users\leand\OneDrive\Projetos\Cartsys\ERPFinanceiro\.claude\worktrees\execucao+executar-lote7\src\ERPFinanceiro.Application\Servicos\ExecutorComRetry.cs:linha 50
+   em ERPFinanceiro.Application.Servicos.CancelamentoService.Cancelar(CancelarVendaCommand comando) na C:\Users\leand\OneDrive\Projetos\Cartsys\ERPFinanceiro\.claude\worktrees\execucao+executar-lote7\src\ERPFinanceiro.Application\Servicos\CancelamentoService.cs:linha 83
+   em ERPFinanceiro.Api.Controllers.VendasController.Cancelamento(CancelamentoRequestDto dto) na C:\Users\leand\OneDrive\Projetos\Cartsys\ERPFinanceiro\.claude\worktrees\execucao+executar-lote7\src\ERPFinanceiro.Api\Controllers\VendasController.cs:linha 155
+   (pipeline ApiKeyHandler/CorrelationIdHandler/HttpServer padrão OWIN — stack de framework suprimida a partir daqui)
+RESPONSE:
+  HTTP 409
+  Body: {"erro":{"codigo":"MOTIVO_OBRIGATORIO","mensagem":"Motivo do cancelamento é obrigatório."}}
+   [OK] HTTP 409, erro.codigo=MOTIVO_OBRIGATORIO.
+
+--- Cenário: 4. Reenvio pós-timeout — mesmo payload do cenário 1 (idempotência P-2) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T39
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-PEND-1790182803"}
+2026-09-23T17:00:04.6352328Z [1637c6a7-e341-4c30-ae2c-78acfa6b7ad7] Cancelamento processado para venda 'V-T39-SIM-PEND-1790182803' (status resultante: Cancelada).
+RESPONSE:
+  HTTP 200
+  Body: {"status":"Cancelada"}
+   [OK] HTTP 200, status=Cancelada (mesmo resultado do cenário 1, reenvio idempotente).
+   [DB]  Consulta direta ao banco (VendaHistorico) apos reenvio: 2 registro(s) (antes do reenvio: 2).
+   [OK] Contagem de VendaHistorico inalterada (2 -> 2) — reenvio pós-timeout NAO gerou novo histórico (P-2 confirmado por consulta direta ao banco).
+
+--- Cenário: 5a. Payload inválido — vendaId ausente (400) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T39
+  Content-Type: application/json
+  Body: {"motivo":"sem vendaId"}
+2026-09-23T17:00:04.6676452Z [] ERPFinanceiro.Application.Exceptions.ValidacaoException: O campo 'vendaId' é obrigatório.
+   em ERPFinanceiro.Api.Controllers.VendasController.Cancelamento(CancelamentoRequestDto dto) na C:\Users\leand\OneDrive\Projetos\Cartsys\ERPFinanceiro\.claude\worktrees\execucao+executar-lote7\src\ERPFinanceiro.Api\Controllers\VendasController.cs:linha 148
+   (pipeline ApiKeyHandler/CorrelationIdHandler/HttpServer padrão OWIN — stack de framework suprimida a partir daqui)
+RESPONSE:
+  HTTP 400
+  Body: {"erro":{"codigo":"PAYLOAD_INVALIDO","mensagem":"O campo 'vendaId' é obrigatório."}}
+   [OK] HTTP 400, erro.codigo=PAYLOAD_INVALIDO.
+
+--- Cenário: 5b. Sem X-Api-Key (401) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: (ausente)
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-PEND-1790182803"}
+2026-09-23T17:00:04.6696725Z [4230ea7d-95d0-410f-bd59-99c2c7697935] Requisição rejeitada: X-Api-Key ausente ou inválida.
+RESPONSE:
+  HTTP 401
+  Body: {"erro":{"codigo":"NAO_AUTORIZADO","mensagem":"Credencial de acesso ausente ou inválida."}}
+   [OK] HTTP 401, erro.codigo=NAO_AUTORIZADO (header ausente).
+
+--- Cenário: 5c. X-Api-Key errada (401) ---
+REQUEST:
+  POST http://localhost:5039/api/vendas/cancelamento
+  X-Api-Key: CHAVE_ERRADA_T39
+  Content-Type: application/json
+  Body: {"vendaId":"V-T39-SIM-PEND-1790182803"}
+2026-09-23T17:00:04.6706944Z [dbd77bac-6cb3-4b5e-af63-f0f0cb322607] Requisição rejeitada: X-Api-Key ausente ou inválida.
+RESPONSE:
+  HTTP 401
+  Body: {"erro":{"codigo":"NAO_AUTORIZADO","mensagem":"Credencial de acesso ausente ou inválida."}}
+   [OK] HTTP 401, erro.codigo=NAO_AUTORIZADO (chave inválida).
+   [OK] Corpo do 401 idêntico nos dois casos (sem header / chave errada) — nenhuma distinção revelada ao chamador (T-35).
+
+================================================================================
+[T39] Resultado: 8/8 verificações OK.
+[T39] SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi). Harness HTTP fazendo o papel do Vendas contra a API local (ADR-010).
+================================================================================
+
+═══════════════════════════════════════════════════════════════════════════════
+RESUMO
+═══════════════════════════════════════════════════════════════════════════════
+2 execuções seguidas, cada uma com banco novo (.fdb apagado/recriado) e vendaId novo (timestamp),
+ambas 8/8 verificações OK. Nenhuma divergência encontrada em relação a docs/contrato-v1.1.md
+Seção 3.2 nem ao comportamento já coberto por ApiHostVendasCancelamentoControllerTests (T-32) —
+nada a registrar em T-40 por esta tarefa.
+
+SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi). Ver ADR-010/BLOCKERS.md Bloqueio 002.

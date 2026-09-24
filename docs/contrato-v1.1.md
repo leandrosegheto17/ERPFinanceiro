@@ -62,6 +62,30 @@ tarefa (T-03), que é produzir e deixar pronta a proposta.
 | `CONFLITO_CONCORRENCIA` | 409 | Conflito de `VERSAO` não resolvido após 3 tentativas de releitura |
 | `ERRO_INTERNO` | 500 | Falha não tratada; corpo não revela detalhe da exceção |
 
+**409 — conflito de concorrência** (aplicável a `POST /api/vendas/quitacao` e
+`POST /api/vendas/cancelamento`; mensagem conforme
+`ExceptionParaRespostaMapper.MensagemConflitoConcorrencia`, RL1-01a):
+```json
+{
+  "erro": {
+    "codigo": "CONFLITO_CONCORRENCIA",
+    "mensagem": "Conflito de concorrência ao processar a operação; tente novamente."
+  }
+}
+```
+
+**500 — erro interno** (aplicável a qualquer endpoint autenticado; mensagem
+genérica, sem detalhe da exceção original — regra 7 do `TASK.md` Seção 1;
+conforme `ExceptionParaRespostaMapper.MensagemGenericaErroInterno`):
+```json
+{
+  "erro": {
+    "codigo": "ERRO_INTERNO",
+    "mensagem": "Ocorreu um erro interno inesperado. Consulte o suporte informando o horário da operação."
+  }
+}
+```
+
 ---
 
 ## 3. Endpoints
@@ -121,6 +145,22 @@ Entrada:
 }
 ```
 
+> **Nota (T-37, validado contra a API real):** os números dentro desta
+> mensagem são formatados com a *culture* corrente do processo da Api
+> (`ValidadorVendaCommand`, interpolação de string simples), não com
+> `CultureInfo.InvariantCulture`. Em host com *culture* pt-BR — caso
+> confirmado nesta validação — a mensagem real sai com vírgula decimal
+> (ex.: `"valorTotal (1250,50) diverge da soma dos itens (1240,00) além da
+> tolerância de 0,01."`), diferente do separador `.` usado no exemplo acima
+> e do formato de número JSON exigido pelo P-6 para os *campos* do corpo
+> (este texto é mensagem legível, não um campo JSON tipado — P-6 não se
+> aplica a ele). Como o separador depende da *culture* do host de produção
+> (não determinístico entre ambientes), o lado Vendas **não deve fazer
+> parsing** desse texto — só do campo `codigo`. Ajuste de código (forçar
+> `CultureInfo.InvariantCulture` em `ValidadorVendaCommand`) é uma
+> correção pontual de implementação, fora do escopo de T-37 (que só
+> valida/ajusta este documento); sinalizado aqui para follow-up.
+
 **401 — sem `X-Api-Key` ou chave inválida:**
 ```json
 {
@@ -131,22 +171,22 @@ Entrada:
 }
 ```
 
-**409 — venda já cancelada:**
+**409 — venda já cancelada** (mensagem ajustada por T-37 — ver nota abaixo):
 ```json
 {
   "erro": {
     "codigo": "VENDA_JA_CANCELADA",
-    "mensagem": "A venda V-000123 já está cancelada e não pode ser quitada."
+    "mensagem": "Venda 'V-000123' já está cancelada; Cancelada é um estado terminal."
   }
 }
 ```
 
-**409 — dados divergentes (quitar Pendente com payload diferente do registrado; A VALIDAR D-03/I-04):**
+**409 — dados divergentes (quitar Pendente com payload diferente do registrado; A VALIDAR D-03/I-04)** (mensagem ajustada por T-37 — ver nota abaixo):
 ```json
 {
   "erro": {
     "codigo": "DADOS_DIVERGENTES",
-    "mensagem": "O payload de quitação diverge dos dados registrados na venda Pendente V-000123."
+    "mensagem": "O payload de quitação diverge dos dados registrados na venda Pendente 'V-000123'."
   }
 }
 ```
@@ -180,22 +220,22 @@ Entrada:
 
 **401 — chave inválida:** igual ao exemplo da Seção 3.1.
 
-**404 — alternativa a D-08, se venda desconhecida for rejeitada como "cria Cancelada":**
+**404 — alternativa a D-08, se venda desconhecida for rejeitada como "cria Cancelada"** (mensagem ajustada por T-37 — ver nota abaixo):
 ```json
 {
   "erro": {
     "codigo": "VENDA_NAO_ENCONTRADA",
-    "mensagem": "Venda V-000123 não encontrada."
+    "mensagem": "Venda 'V-000123' não encontrada."
   }
 }
 ```
 
-**409 — cancelar Quitada sem motivo:**
+**409 — cancelar Quitada sem motivo** (mensagem ajustada por T-37 — ver nota abaixo):
 ```json
 {
   "erro": {
     "codigo": "MOTIVO_OBRIGATORIO",
-    "mensagem": "Cancelar uma venda quitada exige o campo 'motivo'."
+    "mensagem": "Motivo do cancelamento é obrigatório."
   }
 }
 ```
@@ -214,12 +254,12 @@ Valores possíveis de `status` (string, PascalCase — P-3): `"Pendente"`, `"Qui
 
 **401 — chave inválida:** igual ao exemplo da Seção 3.1.
 
-**404 — venda inexistente:**
+**404 — venda inexistente** (mensagem ajustada por T-37 — ver nota abaixo):
 ```json
 {
   "erro": {
     "codigo": "VENDA_NAO_ENCONTRADA",
-    "mensagem": "Venda V-000999 não encontrada."
+    "mensagem": "Venda 'V-000999' não encontrada."
   }
 }
 ```
@@ -262,6 +302,48 @@ Este endpoint não usa o envelope `{erro:{...}}` (não é um erro de requisiçã
 Cada rota acima também responde de forma idêntica prefixada por `/api/v1`
 (ex.: `POST /api/v1/vendas/quitacao`), mapeada ao mesmo controller. Rota canônica
 `/api/vendas/...` é a acordada na v1.0 e não muda de comportamento.
+
+### 3.7 Validação dos exemplos contra a API real (T-37)
+
+Autor: Executor (chapéu QA), tarefa T-37. Base: `docs/postman/smoke-vendas.sh`
+(T-34, revisado por esta tarefa) rodado contra a Api real via
+`tools/T-34-smoke-harness/` (mesmo caminho de produção `ApiHost` + `Startup` +
+`CompositionRoot.Construir()`), Firebird embarcado real. Evidência bruta em
+`docs/postman/evidencia-execucao-T-37.txt`.
+
+Todos os exemplos JSON das Seções 2, 3.1, 3.2, 3.3 e 3.5 foram reproduzidos e
+comparados campo a campo, código a código, com a resposta real da Api
+(exceto valores dinâmicos: `dataQuitacao`, `vendaId` gerado por execução,
+timestamps). Resultado:
+
+- **Corpo de sucesso** (200 quitação/cancelamento/status, 200/503 health) e
+  **envelope de erro** (`{erro:{codigo,mensagem}}`), **401** (Seção 2/3.1,
+  as duas variantes "ausente"/"inválida") e **400** `PAYLOAD_INVALIDO`
+  (`itens` vazio e `vendaId` ausente) e `VALOR_TOTAL_DIVERGENTE` (formato):
+  batem **byte a byte** com a API real (à parte da nota sobre separador
+  decimal em `VALOR_TOTAL_DIVERGENTE`, Seção 3.1 acima).
+- **Divergências de texto de `mensagem` encontradas e corrigidas neste
+  documento** (código de erro e HTTP status batiam; só o texto divergia —
+  a API é a fonte de verdade agora que está implementada, não a proposta
+  escrita em T-03 antes da implementação):
+  - `409 VENDA_JA_CANCELADA` (Seção 3.1): mensagem real usa aspas simples ao
+    redor do `vendaId` e frase diferente ("... é um estado terminal.", em vez
+    de "... e não pode ser quitada.").
+  - `409 DADOS_DIVERGENTES` (Seção 3.1): mensagem real usa aspas simples ao
+    redor do `vendaId`.
+  - `404 VENDA_NAO_ENCONTRADA` (Seções 3.2 e 3.3): mensagem real usa aspas
+    simples ao redor do `vendaId` (contrato não tinha aspas).
+  - `409 MOTIVO_OBRIGATORIO` (Seção 3.2): mensagem real é mais curta e não
+    cita o campo `motivo` nem o `vendaId` ("Motivo do cancelamento é
+    obrigatório.").
+  - `400 PAYLOAD_INVALIDO`/`vendaId` obrigatório (Seção 3.2) e `401`
+    (Seções 2/3.1) **já batiam exatamente**, sem ajuste necessário.
+- Endpoint aditivo `POST /api/vendas` (Seção 3.4, D-03/P-9) **não foi
+  validado** nesta tarefa: ainda não implementado (T-62, Tier B
+  condicional) — os exemplos dessa seção continuam sendo só a proposta,
+  sem confirmação contra API real.
+- Alias `/api/v1/vendas/...` (Seção 3.6): confirmado espelhando exatamente
+  o comportamento das rotas canônicas (`quitacao` e `status` testados).
 
 ---
 

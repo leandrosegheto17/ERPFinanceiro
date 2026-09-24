@@ -2,29 +2,25 @@
 
 > Origem: tarefa T-02 (Lote 1), spike parte de T-02 (ver `.md/TASK.md` Seção 2). Alimenta ADR-006/ADR-008 (fluxo do relatório: preview ou fallback PDF) e G-2/G-6 do `GUARDRAILS.md` (custo zero).
 
-## Limitação do ambiente (declarada conforme critério de aceite item 3)
+## Situação atual (23/09/2026)
 
-Este ambiente de execução é um sandbox de linha de comando sem GUI Windows e sem
-acesso a instaladores/downloads de produtos comerciais (o instalador da
-DevExpress exige cadastro/login e é um `.exe` interativo; o do FastReport idem).
-**Não foi possível instalar de fato** o DevExpress WinForms trial nem o
-FastReport trial/Open Source neste ambiente. As respostas abaixo são baseadas em
-**pesquisa na documentação oficial** (DevExpress Docs/Support Center, FastReport
-Open Source docs/GitHub, NuGet), pesquisada via WebSearch/WebFetch em
-22/09/2026. Isso é uma limitação documental, não um bloqueio: a tarefa é
-majoritariamente de documentação (ver TASK.md T-02), e a decisão de fluxo
-(preview vs. PDF) já foi tomada por precaução no ADR-008 com base nesta mesma
-pesquisa. **Ação pendente para quando houver ambiente com GUI disponível:**
-instalar os dois produtos de fato e confirmar visualmente watermark/preview
-antes de T-49/T-50 serem implementadas, ajustando esta tabela se algo divergir.
+- **DevExpress vem do nuget.org público.** Em 23/09/2026 verificou-se que o pacote `DevExpress.Win.Grid` (versões 25.1.x e 26.1.x; publicado e verificado pela DevExpress, owner `devexpress`) está no nuget.org público e **restaura e compila** neste sandbox (projeto `net48`, `PackageReference Include="DevExpress.Win.Grid" Version="25.1.9"`, ver `src/ERPFinanceiro.Desktop/ERPFinanceiro.Desktop.csproj`, T-42). A página oficial de trial (https://www.devexpress.com/products/try/) lista a opção "NuGet.org (for all .NET products/libraries)". Não é necessário instalador interativo nem feed licenciado.
+- **Modo evaluation.** O build emite os warnings `DX1000` ("For evaluation purposes only. Redistribution prohibited. Please register an existing license (devexpress.com/DX1000) or purchase a new license (devexpress.com/BUY)...") e `DX1001` (baixar a chave pessoal `DevExpress_License.txt` e colocá-la em `%AppData%\DevExpress`, ou rodar o Unified Component Installer para ativar).
+- **Pendência a confirmar:** quando começa o relógio do trial de 30 dias no modo NuGet (primeiro restore? primeiro build? registro de conta?). Não confirmado; não assumir.
+- **Pendência de confirmação VISUAL (RL1-03):** ainda não foi possível ver, numa máquina com GUI, o splash/marca d'água de trial reais em runtime e nos relatórios exportados. Confirmar antes de T-49/T-50 e ajustar esta página se algo divergir. (As descrições de splash/watermark abaixo vêm da documentação oficial.)
+- **Proibição de redistribuição.** A licença de avaliação proíbe redistribuir o build trial; o splash/marca d'água de trial persistem em runtime e nos relatórios exportados. O guardrail G-2 (custo zero) entra em conflito com isso se a entrega final usar DevExpress em evaluation.
+- **Caminho possível para licença válida:** o usuário já usa DevExpress no Delphi (VCL), que é linha de produto separada. Se a assinatura for **Universal**, ela cobre WinForms sem custo adicional. Isso **não foi confirmado**; conferir na conta em devexpress.com.
+- **Checklist objetivo para T-53 (empacotamento Release/entrega):** confirmar licença DevExpress válida/registrada (ou decisão explícita do usuário aceitando entrega em modo evaluation) antes de empacotar. Reflexo também no README (T-54).
+- **Nota para o Gestor:** conflito entre G-2 (custo zero) e a proibição de redistribuir o trial — decisão de negócio do usuário/Gestor, não do Executor.
+- **FastReport:** a seção abaixo continua baseada em pesquisa documental (22/09/2026); a instalação real do FastReport .NET Trial segue pendente de confirmação visual. FastReport Open Source também está no NuGet público.
 
 ## DevExpress WinForms
 
 | Campo | Resposta |
 |---|---|
-| Versão pesquisada | Última disponível no instalador unificado ".NET & JavaScript Unified Component Installer" (linha 20xx.x mais recente à data da pesquisa) — **a versão exata só é conhecida após o download real**; registrar aqui a versão exibida em "Sobre" assim que instalado |
-| Tipo de licença | Trial/Evaluation (30 dias), sem custo, conforme G-2 (custo zero) |
-| Duração do trial | **30 dias corridos** a partir da instalação (termos "THIRTY (30) DAY EVALUATION (TRIAL) USE LICENSE", DevExpress EULA/Support Center) |
+| Versão pesquisada | `DevExpress.Win.Grid` 25.1.9 via nuget.org público (em uso, T-42); 25.1.x e 26.1.x disponíveis |
+| Tipo de licença | Trial/Evaluation (30 dias), sem custo, mas **"Redistribution prohibited"** (aviso DX1000): o build trial não pode ser entregue como produto final; ver "Situação atual" e checklist de T-53 |
+| Duração do trial | **30 dias corridos** (termos "THIRTY (30) DAY EVALUATION (TRIAL) USE LICENSE", DevExpress EULA/Support Center); **início do relógio no modo NuGet não confirmado** (pendência) |
 | Tem marca d'água / aviso? | **Sim.** Fontes oficiais da DevExpress (Support Center, docs de "Remove the Trial Version Message") confirmam que a versão trial exibe: (1) diálogo/splash "This application was created using the trial version of..." ao rodar o app; (2) watermark em relatórios/documentos exportados (XtraReports) durante o período de avaliação; (3) avisos no compilador/designer da IDE. Some watermarks (impressão/exportação de relatórios) exigem licença paga para remoção mesmo após registro do trial |
 | Tem preview? | Não aplicável a WinForms controls em si (grid/controles rodam nativamente); ver FastReport abaixo para preview de relatório |
 
@@ -53,5 +49,5 @@ Com base na pesquisa acima:
 
 ## Resumo para o README (T-54)
 
-- DevExpress WinForms: trial de 30 dias, com aviso/splash de trial e watermark em impressão/exportação de relatórios enquanto não licenciado — custo zero, conforme G-2.
+- DevExpress WinForms: obtido do nuget.org público (`DevExpress.Win.Grid` 25.1.9) em modo evaluation/trial de 30 dias (início do relógio via NuGet ainda não confirmado), com avisos DX1000/DX1001 no build, splash de trial e watermark em impressão/exportação. A licença de avaliação **proíbe redistribuição**: a entrega final exige licença DevExpress válida/registrada (por exemplo, se a assinatura Universal existente cobrir WinForms, a confirmar) ou decisão explícita do usuário aceitando entrega em modo evaluation. Conflito com G-2 (custo zero) sinalizado ao Gestor.
 - FastReport: usar FastReport .NET Trial para preview WinForms nativo (com marca d'água esperada durante avaliação) ou FastReport Open Source (MIT, sem preview WinForms nativo, PDF via plugin) — ambos custo zero; ver decisão acima. Documentar no README qual dos dois foi efetivamente empacotado na entrega (T-53) e o motivo.

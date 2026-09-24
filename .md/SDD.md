@@ -118,13 +118,13 @@ Regras Firebird: identificadores <= 31 chars (nomes de constraints/índices expl
 | RT-01 | Provider EF6 Firebird imaturo (concorrência, DECIMAL, identity/generator, `Take/Skip`) | Alta | Spike de ~2h no Dia 1 com go/no-go; fallback SQL Server; SQL explícito pontual permitido |
 | RT-02 | Trial DevExpress/FastReport: marca d'água, expiração, avaliador sem trial | Alta | Confirmar no Dia 1; README; evidências (prints, PDF) |
 | RT-03 | Capacidade: P0 = 43h em 5 dias | Alta | Escopo por tiers; ordem de corte do VISAO 6.2; nada de Tier B/C antes de O-11 |
-| RT-04 | Contrato v1.1 não aceito pelo Vendas / sem acesso ao código | Alta | Congelar Dia 1; testar por Postman/curl; mudanças só aditivas; `POST /api/vendas` opcional |
+| RT-04 | Contrato v1.1 não aceito pelo Vendas / sem acesso ao código | Alta | Congelar Dia 1; testar por Postman/curl; mudanças só aditivas; `POST /api/vendas` opcional. **Materializado em 23/09/2026** (sem aceite do Vendas e sem acesso ao Delphi real): T-38/T-39 redefinidas para suíte de integração simulada via harness HTTP (ADR-010, `BLOCKERS.md` Bloqueio 002); integração real com o Vendas fica dívida/pendência explícita, não fechada nesta entrega, sujeita a retomada em ambiente com acesso ao Delphi real |
 | RT-05 | Bitness das DLLs Firebird embarcadas e acesso de dois processos ao `.fdb` | Média | Fixar plataforma; único processo abre o `.fdb` (ADR-008); detectar `.fdb` bloqueado e mostrar erro claro |
 | RT-06 | OWIN `HttpListener` em porta ocupada/firewall | Média | Porta configurável; falha de bind mostrada na barra de status; fallback `127.0.0.1` |
 | RT-07 | Decimal/data Delphi↔C# | Média | Serializer com `decimal`; exemplos JSON em `docs/`; teste de contrato |
 | RT-08 | Multi-thread: Web API atende em thread pool enquanto a UI lê | Média | `DbContext` por requisição/operação (escopo Autofac), nunca compartilhado com a UI |
 | RT-09 | Desempenho grid com muitas vendas | Baixa | Paginação/limite de 5.000 linhas + aviso; índices; leitura `AsNoTracking` |
-| **Dívidas aceitas** | (a) API Key em texto simples no `.config` (contexto de desafio); (b) sem TLS (localhost); (c) sem estorno formal (S-13); (d) log estruturado e histórico na tela podem cair (Tier C) — histórico continua gravado; (e) `ClienteId` sem nome (D-10) | — | Motivo: prazo/custo zero; documentar no README |
+| **Dívidas aceitas** | (a) API Key em texto simples no `.config` (contexto de desafio); (b) sem TLS (localhost); (c) sem estorno formal (S-13); (d) log estruturado e histórico na tela podem cair (Tier C) — histórico continua gravado; (e) `ClienteId` sem nome (D-10); (f) **integração real com o Vendas (Delphi) não executada/verificada nesta entrega** (T-38/T-39 só como suíte simulada via harness HTTP, RT-04/ADR-010) — pendência externa, retomar quando houver ambiente com acesso ao Delphi real e aceite formal do contrato | — | Motivo: (a)-(e) prazo/custo zero; (f) dependência externa fora do alcance do sandbox; documentar no README (T-54) |
 
 ## 7. Requisitos de Segurança (nível de arquitetura)
 

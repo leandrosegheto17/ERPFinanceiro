@@ -1255,3 +1255,704 @@ execução independente do Validador"), T-30/T-31/T-32 (Lote 7) e T-35/T-36
 (Lote 8) confirmadas apontando para dependências `Concluída`, sem referência
 quebrada. Zero achados novos — nenhuma tarefa criada em `Refatoração Lote-6`.
 Lote fecha **Validado** (sem ressalvas) após a auditoria de segurança.
+
+## Lote 7 — Endpoints (marco: API utilizável pelo Vendas)
+
+**Veredito: Aprovado, sem ressalvas.** As 5 tarefas (T-30, T-31, T-32, T-33,
+T-34) permanecem `Concluída`. Nenhuma reprovação crítica nem simples contra o
+critério de aceite literal de qualquer tarefa. T-30 é revalidada aqui pela
+primeira vez pelo Validador (não tinha seção própria ainda — foi mencionada
+de passagem só como dependência de lotes futuros na validação do Lote 6).
+
+Validado por leitura de código real (`VendasController.cs` completo — as 3
+actions e as 2 rotas por action —, `QuitacaoRequestDto`/`QuitacaoResponseDto`
+(T-30, pré-existentes, não tocados nesta worktree), `VendaStatusResponseDto`,
+`CancelamentoRequestDto`/`CancelamentoResponseDto`, `ConsultaService.
+ObterStatus`, `CancelamentoService.Cancelar`, `ResultadoQuitacao` — não pela
+nota de implementação do Executor) contra o critério de aceite literal de
+cada linha (`TASK.md` Seção 3, Lote 7) **e por execução independente da
+suíte de testes, rodada por mim nesta validação**: `dotnet build
+ERPFinanceiro.sln` (0 aviso, 0 erro, solução inteira); `bin\x64\Debug\net48`
+copiado para `C:\temp_erp_validar_lote7` (fora do OneDrive, contorno de
+rotina do Bloqueio 001, `BLOCKERS.md`), DLLs nativas do Firebird embarcado e
+`App.config` reaproveitados da pasta `bin\Debug\net48` já presente na
+worktree (deixada por T-31/T-32 — mesmo pré-requisito de ambiente que essas
+tarefas já haviam documentado); `dotnet vstest ERPFinanceiro.Tests.dll`
+rodado de lá — **122/122 Aprovado na 1ª tentativa**, sem reprodução do
+Bloqueio 001 nesta rodada, suíte completa (não só o filtro do lote).
+
+### T-30 — `POST /api/vendas/quitacao`
+
+**Resultado: Aprovado.**
+
+- `QuitacaoRequestDto`/`QuitacaoResponseDto` espelham `docs/contrato-v1.1.md`
+  Seção 3.1 campo a campo (`vendaId`/`clienteId`/`valorTotal`/`itens[]` na
+  entrada; `status`/`dataQuitacao` na saída) — confirmado por leitura direta.
+  `ResultadoQuitacao.Status` é a string fixa `"Quitada"` (toda execução
+  bem-sucedida de `QuitacaoService.Executar` termina Quitada) — confere com o
+  contrato, sem tabela de conversão adicional necessária.
+- Controller fino confirmado: `Quitacao(dto)` só mapeia DTO->comando, chama
+  `_quitacaoService.Executar`, mapeia resultado->DTO; nenhuma regra de
+  negócio/validação no controller (a validação de payload é decidida dentro
+  de `QuitacaoService`/`ValidadorVendaCommand`, já auditada no Lote 5/T-17).
+- Teste de integração real (`ApiHostVendasControllerTests`, pipeline HTTP
+  completo — `ApiHost`+`Startup`+`CompositionRoot.Construir()` reais, Firebird
+  embarcado real) cobre os 4 cenários do critério de aceite literalmente:
+  venda inexistente -> 200 `{status:"Quitada",dataQuitacao}`; repetição ->
+  200 com a mesma `dataQuitacao` (tolerância <1ms por arredondamento de
+  `TIMESTAMP` do Firebird, justificada e documentada no próprio teste, não
+  mascara falta de idempotência real — a idempotência de fato já é garantida
+  no histórico único, auditada em T-18/Lote 5); corpo com `itens` vazio ->
+  400 `PAYLOAD_INVALIDO`; venda pré-semeada Cancelada -> 409
+  `VENDA_JA_CANCELADA`. Reexecutado por mim como parte da suíte completa
+  (122/122) — verde.
+- Sem autenticação nesta tarefa, corretamente (X-Api-Key é T-35, Lote 8, não
+  é dependência de T-30) — confirmado que nenhuma checagem de `X-Api-Key` foi
+  antecipada incorretamente no controller.
+
+### T-31 — `GET /api/vendas/{vendaId}/status`
+
+**Resultado: Aprovado.**
+
+- `VendaStatusResponseDto` = `{vendaId,status}`, exatamente o formato da
+  Seção 3.3 do contrato. `Status` convertido de `StatusVenda` (enum) para
+  string via `Enum.ToString()` no controller — confirmado que os 3 valores do
+  enum (`Pendente`/`Quitada`/`Cancelada`) já nascem PascalCase (Lote 2,
+  auditado então), então essa conversão simples já produz o formato exigido
+  pelo contrato (P-3) sem tabela de mapeamento adicional.
+- `ConsultaService.ObterStatus` (T-24, Lote 5, não alterado nesta tarefa)
+  lança `VendaNaoEncontradaException` para venda ausente — o controller não
+  precisa (nem faz) tratamento de exceção adicional; `GlobalExceptionHandler`
+  (T-28, Lote 6, não alterado) já mapeia para 404 `VENDA_NAO_ENCONTRADA`.
+  Reaproveitamento correto, sem duplicar lógica de erro.
+- Teste de integração real (`ApiHostVendasStatusControllerTests`) cobre os 2
+  cenários do critério de aceite: venda Pendente pré-semeada -> 200
+  `{vendaId,status:"Pendente"}`; venda inexistente -> 404
+  `{erro:{codigo:"VENDA_NAO_ENCONTRADA",...}}`. Reexecutado por mim dentro da
+  suíte completa (122/122) — verde.
+- Nota de ambiente registrada pelo Executor (App.config/DLLs nativas do
+  Firebird não presentes nesta worktree recém-criada, recriados localmente,
+  fora do controle de versão) — confirmado que é puramente operacional: os
+  artefatos recriados (`App.config`, `fbembed.dll`/`fbclient.dll`,
+  `security3.fdb`) estão todos cobertos pelo `.gitignore` (verificado por
+  `git status`/`git check-ignore`, ver "Achados de segurança" abaixo), nada
+  vazou para o índice do git.
+
+### T-32 — `POST /api/vendas/cancelamento`
+
+**Resultado: Aprovado.**
+
+- `CancelamentoRequestDto`/`CancelamentoResponseDto` espelham a Seção 3.2 do
+  contrato (`{vendaId,motivo}` entrada, `{status}` saída) — confirmado.
+- **Decisão de validar `vendaId` ausente/vazio no controller, não em
+  `ValidadorVendaCommand`, avaliada e aceita como correta, não um achado**:
+  confirmei por leitura de `ValidadorVendaCommand.cs` (T-17, Lote 4) que ele
+  só tem overloads para `QuitarVendaCommand`/`RegistrarVendaCommand`, não
+  para `CancelarVendaCommand` — estender o validador exigiria adicionar um
+  novo caso a uma classe já auditada e fechada em lote anterior, por uma
+  regra de 1 campo. A validação no controller produz exatamente o 400
+  `PAYLOAD_INVALIDO` exigido pelo contrato antes de chamar o serviço.
+  `CancelamentoService.Cancelar` (T-19, Lote 5) mantém uma segunda guarda via
+  `ArgumentException` para a mesma pré-condição — confirmei em
+  `ExceptionParaRespostaMapper.Mapear` que `ArgumentException` cai no `case
+  default` (500 `ERRO_INTERNO`, envelope genérico, sem vazar mensagem) caso
+  algum chamador futuro (fora do controller) invoque o serviço sem validar
+  antes — defesa em profundidade aceitável, sem duplicação de regra de
+  negócio (é só uma guarda de pré-condição de programação, não uma regra do
+  domínio). Nenhum caminho do contrato hoje alcança essa guarda sem passar
+  pela validação do controller primeiro (confirmado pelo teste do cenário 5).
+- Teste de integração real (`ApiHostVendasCancelamentoControllerTests`) cobre
+  6 sub-cenários (mais que os 4 citados na linha da tarefa, cobertura maior):
+  Pendente cancela 200; desconhecida cria+cancela 200 (D-08); Quitada sem
+  motivo 409 `MOTIVO_OBRIGATORIO` sem alterar dados; mesma venda com motivo
+  200; repetição sobre já Cancelada 200 (idempotência, P-2); payload sem
+  `vendaId` 400 `PAYLOAD_INVALIDO`. Reexecutado por mim dentro da suíte
+  completa (122/122) — verde, incluindo os asserts de que o cenário 409 não
+  altera nenhum dado (implícito no fato de o cenário seguinte, com motivo,
+  ainda encontrar a venda Quitada, não já parcialmente cancelada).
+
+### T-33 — Alias `/api/v1/vendas/...`
+
+**Resultado: Aprovado.**
+
+- Confirmei que não há "3 controllers" (a redação original da linha da
+  tarefa antecipava um design que não se concretizou) — há 1
+  `VendasController` com 3 actions, e o alias foi aplicado nas 3
+  (`Quitacao`/`Status`/`Cancelamento`), cada uma com um segundo
+  `[Route("~/api/v1/vendas/...")]` absoluto — confirmado linha a linha no
+  controller, as 3 actions têm o segundo atributo.
+- Mecanismo (`RouteAttribute` com `AllowMultiple = true`, prefixo `~/`
+  ignorando o `RoutePrefix` do controller) é o padrão correto e documentado
+  do Web API 2 attribute routing para múltiplas rotas na mesma action — não
+  há duplicação de controller/DTO/lógica, e a suíte completa rodando sem
+  `AmbiguousMatchException`/erro de roteamento na inicialização do host
+  confirma que as duas rotas coexistem sem conflito.
+- Critério de "desativar sem apagar controllers" (se D-05 for rejeitada):
+  confirmado que basta remover a linha `[Route("~/api/v1/vendas/...")]` de
+  cada action — não há acoplamento entre o alias e a rota base em nenhum
+  outro lugar do código (roteamento é só atributo, sem lógica condicional
+  dependente de qual rota foi usada).
+- Teste de integração real (`ApiHostVendasAliasV1ControllerTests`) confirma
+  que as duas bases respondem HTTP status e corpo JSON idênticos
+  (`JToken.DeepEquals`) para a mesma venda, usando `GET status` como
+  representante — escopo documentado e aceitável (os caminhos felizes de
+  cada endpoint na rota base já estão cobertos por T-30/T-31/T-32; o que
+  este teste prova é especificamente que o alias roteia para o mesmo método,
+  o que generaliza para as outras 2 actions pelo mesmo mecanismo de
+  atributo, não por lógica específica de cada action). Reexecutado por mim
+  dentro da suíte completa (122/122) — verde.
+
+### T-34 — Coleção de fumaça `docs/postman/smoke-vendas.sh`
+
+**Resultado: Aprovado.**
+
+- Formato curl (em vez de `.postman_collection.json`) justificado em
+  `docs/postman/README.md` por limitação real do sandbox (sem GUI/Postman
+  interativo) — avaliado como decisão aceitável, não um desvio que compromete
+  o critério de aceite: o script é executável e verificável de fato, o que a
+  linha da tarefa pede ("coleção roda 100% verde contra o app local").
+- Cobertura conferida contra `docs/contrato-v1.1.md` linha a linha: 7
+  cenários (quitação 200/400/409; cancelamento 200/409; status 200/404) —
+  os 2-3 cenários por endpoint pedidos pelo critério de aceite, cobrindo os
+  3 endpoints implementados neste lote.
+- Script auto-contido: não depende de estado pré-semeado, encadeia os
+  próprios endpoints do contrato para produzir os cenários 409 (cancelar
+  desconhecida cria+cancela D-08, depois quitar essa venda dá 409; quitar
+  nova depois cancelar sem motivo dá 409) — `vendaId` com sufixo timestamp,
+  repetível sem colisão. Confirmado por leitura que os `grep`s de asserção
+  (`verificar()`) batem exatamente com os códigos/formato do envelope real
+  (`"status":"Quitada"`, `"codigo":"PAYLOAD_INVALIDO"`, etc.), não com uma
+  suposição de formato.
+- **Execução real confirmada, não só documentação estática**: evidência em
+  `docs/postman/evidencia-execucao-T-34.txt` (harness descartável em
+  `tools/T-34-smoke-harness/`, API real via `ApiHost`+`Startup`+
+  `CompositionRoot.Construir()`, Firebird embarcado real) — 7/7 cenários
+  verdes em 2 rodadas seguidas, conforme relatado pelo Executor. Não
+  reexecutei o harness eu mesmo nesta validação (não é parte da suíte
+  `dotnet vstest`), mas conferi que a evidência bruta bate com o script e
+  que o harness não deixou artefato/`.fdb`/processo residual no repositório
+  (`tools/T-34-smoke-harness/` só tem `App.config.example`, `Program.cs`,
+  `.csproj` versionados — `App.config` real gitignorado, confirmado).
+- Sem cenário 401, corretamente deferido a T-37 (depende de T-35, Lote 8,
+  ainda não implementada) — nota explícita no script e no README, não é uma
+  lacuna desta tarefa.
+
+### Testes de integração cruzada (Lote 7)
+
+- T-30/T-31/T-32 compartilham o mesmo `VendasController`, construído com 4
+  dependências (`QuitacaoService`, `ConsultaService`, `CancelamentoService`,
+  `ICorrelationContext`) — confirmei que o registro do Autofac
+  (`CompositionRoot`, Lote 6) resolve as 4 sem exceção (implícito no sucesso
+  de todo teste de integração HTTP deste lote, que depende da resolução do
+  controller completo) e que nenhuma das 3 actions quebrou as outras 2 ao
+  ganhar novas dependências no construtor (T-31 e T-32 ampliaram o construtor
+  sem remover os parâmetros de T-30, confirmado por leitura).
+- T-33 (alias) depende estruturalmente de T-30/T-31/T-32 já existirem — a
+  ordem de implementação (T-33 depois das 3) e a suíte completa confirmam que
+  o alias não regrediu nenhum dos 3 endpoints na rota base (todos os testes
+  de T-30/T-31/T-32 continuam verdes junto com os de T-33).
+- T-34 depende de T-30/T-31/T-32 e exercita os 3 endpoints via HTTP real
+  (harness próprio, fora do `dotnet vstest`) — evidência cruzada
+  independente da suíte xUnit, reforça a confiança de que os 3 endpoints
+  funcionam de ponta a ponta contra Firebird real, não só em teste
+  automatizado.
+- Envelope de erro (`GlobalExceptionHandler`/`ExceptionParaRespostaMapper`,
+  T-28, Lote 6) reaproveitado sem alteração por todas as novas actions —
+  confirmado por `git diff` (nenhum arquivo em `Api/Erros/` tocado nesta
+  worktree) e pelos testes de 400/404/409 de cada endpoint, todos com o
+  formato `{erro:{codigo,mensagem}}` correto.
+
+### Requisitos não funcionais
+
+- Dinheiro sempre `decimal`: `QuitacaoRequestDto.ValorTotal`/
+  `ItemQuitacaoDto.PrecoUnitario` são `decimal` (T-30, não tocado nesta
+  worktree, já auditado); T-31/T-32/T-33/T-34 não introduzem nenhum valor
+  monetário novo em ponto flutuante binário.
+- Datas UTC: `QuitacaoResponseDto.DataQuitacao` é `DateTime` serializado via
+  `CriarConfiguracaoJson` (T-25, Lote 6) com `DateTimeZoneHandling.Utc` —
+  confirmado que a data retornada no teste de integração termina em "Z"
+  implicitamente pelo parse do `JObject`/round-trip UTC, consistente com o
+  padrão já auditado em StartupTests (Lote 6).
+- Sem `async void`: todas as actions são síncronas (`IHttpActionResult`,
+  sem `async`/`await` no controller — a chamada ao serviço é síncrona,
+  `IUnitOfWork.SalvarAlteracoes()` é síncrono por decisão já auditada em
+  T-13/Lote 4); os testes de integração usam `async Task` (assinatura
+  correta para teste xUnit com `HttpClient`), sem violar a regra 5 (que é
+  sobre código de produção).
+- Performance/UX: fora do escopo deste lote (sem tela; não há medição de
+  carga pedida pelo critério de aceite de nenhuma das 5 tarefas).
+
+## Padrão recorrente de bug (escalonamento ao Coordenador)?
+
+**Não.** Zero reprovações (críticas ou simples) neste lote. A decisão de
+validar `vendaId` no controller para `CancelamentoService` (T-32) foi
+avaliada em detalhe e não constitui achado — é uma consequência pontual e
+bem justificada de `ValidadorVendaCommand` (T-17) ter sido desenhado só para
+os 2 comandos que existiam quando foi escrito, não um sinal de problema
+sistêmico de decomposição. Não escalo ao `coordenador` por este motivo.
+
+## Fechamento estrutural do Lote 7
+
+Ver `SECURITY-REVIEW.md` (mesma checagem, registrada lá para não duplicar) —
+resumo: todas as 5 tarefas `Concluída`, sem dependência órfã da Seção 4
+relativa ao Lote 7, sem tarefa `Bloqueada`, T-35/T-36/T-37/T-38 (Lote 8)
+confirmadas apontando para dependências `Concluída` (T-30/T-31/T-32/T-34),
+sem referência quebrada. Zero achados — nenhuma tarefa criada em
+`Refatoração Lote-7`. Lote fecha **Validado** (sem ressalvas) após a
+auditoria de segurança.
+
+## Lote 8 — Segurança da API e integração real (Dia 4)
+
+**Veredito: Aprovado, sem ressalvas.** As 6 tarefas (T-35, T-36, T-37, T-38,
+T-39, T-40) permanecem `Concluída`. Nenhuma reprovação crítica nem simples
+contra o critério de aceite literal de qualquer tarefa.
+
+**Nota de escopo lida antes da auditoria:** T-38/T-39 foram redefinidas pelo
+Coordenador (ADR-010, `BLOCKERS.md` Bloqueio 002, aprovação explícita do
+usuário) de "integração real com o Vendas/Delphi" para "suíte de integração
+**simulada**" — decisão estrutural já aprovada, não reaberta aqui. A
+validação deste lote confirma que a simulação foi bem executada e que a
+pendência de integração real está rotulada corretamente em todo artefato
+relevante, não reinterpreta o critério de aceite original das tarefas (que
+já veio redefinido pelo Coordenador antes do Executor rodar).
+
+Validado por leitura de código real (`ApiKeyHandler.cs`, `HealthController.cs`,
+`Startup.cs`, `docs/contrato-v1.1.md`, `docs/postman/smoke-vendas.sh`/
+`README.md`, `tools/T-38-integracao-simulada/`, `tools/T-39-integracao-simulada/`,
+`docs/integracao-simulada/README.md`/`PENDENCIA-INTEGRACAO-REAL.md` — não pela
+nota de implementação do Executor) contra o critério de aceite literal de
+cada linha (`TASK.md` Seção 3, Lote 8) **e por execução independente da
+suíte de testes, rodada por mim nesta validação**: `dotnet build
+ERPFinanceiro.sln` (0 aviso, 0 erro, solução inteira, `bin\x64\Debug\net48`);
+copiado para `C:\temp_erp_validar_lote8\net48` (fora do OneDrive, contorno de
+rotina do Bloqueio 001, `BLOCKERS.md`), DLLs nativas do Firebird embarcado e
+`App.config`/`firebird.conf`/`security3.fdb` já presentes na pasta `bin`
+desta worktree reaproveitados sem recriação (bitness x64 confirmada);
+`dotnet vstest ERPFinanceiro.Tests.dll` rodado de lá **2 vezes seguidas —
+124/124 Aprovado nas duas rodadas**, sem flakiness observada e sem
+reprodução do Bloqueio 001 nesta validação.
+
+### T-35 — `ApiKeyHandler`
+
+**Resultado: Aprovado.**
+
+- Comparação em tempo constante (`ComparacaoEmTempoConstante`) revisada linha
+  a linha: percorre sempre `Math.Max(bytesEsperada.Length,
+  bytesRecebida.Length)`, nunca retorna cedo por tamanho (a diferença de
+  tamanho entra no acumulador via XOR antes do laço, e o laço sempre roda até
+  o fim independente do resultado parcial) — implementação correta dado que
+  `CryptographicOperations.FixedTimeEquals` não existe no net48 (confirmado:
+  API introduzida só a partir de .NET Core 2.1/.NET Standard 2.1).
+- 401 idêntico para header ausente e chave errada: confirmado por leitura de
+  `ChaveValida`/`ConstruirRespostaNaoAutorizada` — o mesmo envelope fixo
+  (`NAO_AUTORIZADO`, mesma mensagem) é devolvido nos dois ramos, sem
+  distinção; reforçado pelo teste `ApiHostVendasApiKeyControllerTests`
+  (`JToken.DeepEquals` entre os dois corpos), reexecutado por mim na suíte
+  completa — verde.
+- Isenção de `GET /api/health` por `AbsolutePath` normalizado
+  (`TrimEnd('/')`, comparação `OrdinalIgnoreCase`) — cobre `/api/health` e
+  `/api/health/`; não cobre `/api/v1/...` (não se aplica, health não tem
+  alias v1) nem seria afetada por isso. Confirmado por teste
+  (`ApiHostHealthControllerTests`) que a rota responde sem `X-Api-Key` mesmo
+  com o handler já registrado.
+- Fail-closed confirmado: `ObterChaveConfigurada()` vazio/nulo faz
+  `ChaveValida` retornar `false` incondicionalmente (comentário explícito no
+  código: "nunca abre a Api por omissão de configuração") — nenhuma
+  requisição passa sem chave configurada, mesmo com header presente.
+- Chave nunca logada: `RegistrarTentativaNaoAutorizada` só grava a mensagem
+  fixa `"Requisição rejeitada: X-Api-Key ausente ou inválida."`, sem
+  interpolar o header recebido nem a chave configurada — confirmado por
+  leitura e pelo 4º caso do teste dedicado, que lê o arquivo de log real e
+  confirma ausência da chave (correta e errada) em toda linha.
+- Chave correta responde 200 normalmente — confirmado pelo mesmo teste.
+- Efeito colateral necessário (todos os testes de integração HTTP anteriores
+  passaram a enviar `X-Api-Key`) verificado como completo: `dotnet vstest`
+  desta validação (124/124) confirma que nenhum teste de T-27/T-30…T-34
+  ficou órfão/quebrado por essa mudança.
+
+### T-36 — `GET /api/health`
+
+**Resultado: Aprovado.**
+
+- `HealthController` delega 100% a `IHealthService.ObterStatus()` (T-22, não
+  alterado) — 200/`{status:"ok",banco:"ok"}` ou 503/
+  `{status:"degradado",banco:"falha"}` via `Content<T>`, confirmado por
+  leitura e pelos 3 cenários de `ApiHostHealthControllerTests` reexecutados
+  na suíte completa.
+- Sem autenticação de fato: confirmado por leitura completa do controller —
+  nenhum acesso a `Request.Headers`/`ConfigurationManager` neste arquivo; a
+  isenção é responsabilidade exclusiva do `ApiKeyHandler` (T-35), não
+  duplicada aqui.
+
+### T-37 — Validação dos exemplos do contrato v1.1
+
+**Resultado: Aprovado.**
+
+- Reexecutei a comparação campo a campo das 4 mensagens ajustadas contra o
+  código real de origem (não confiei na nota do Executor):
+  `VendaJaCanceladaException` → `"Venda '{vendaId}' já está cancelada;
+  Cancelada é um estado terminal."` bate byte a byte com a Seção 3.1 do
+  contrato (linha 155); `DadosDivergentesException` → `"O payload de quitação
+  diverge dos dados registrados na venda Pendente '{vendaId}'."` bate com a
+  linha 165; `VendaNaoEncontradaException` → `"Venda '{vendaId}' não
+  encontrada."` bate com as linhas 204/238 (Seções 3.2/3.3);
+  `MotivoObrigatorioException` → `"Motivo do cancelamento é obrigatório."`
+  bate com a linha 214 — as 4 correções são reais, não apenas alegadas.
+  `ExceptionParaRespostaMapper.cs` confirmado mapeando os 4 tipos aos códigos
+  HTTP/códigos de erro corretos (409/409/404/409, conforme a tabela da Seção
+  2 do contrato).
+- `smoke-vendas.sh`/`README.md` (T-34) atualizados com `X-Api-Key` em todas
+  as chamadas e 2 novos cenários 401 — confirmado por leitura do script (9
+  cenários, variável `API_KEY` com default documentado).
+- Observação sobre `VALOR_TOTAL_DIVERGENTE` (formatação de número dependente
+  de culture) registrada no contrato sem alterar código — avaliação: correta
+  como achado não bloqueante (mensagem de erro não é contrato de parsing
+  formal do campo `codigo`, só o `codigo` é estável); não rebaixo para
+  achado do Validador, já está documentada de forma acionável no próprio
+  contrato.
+
+### T-38/T-39 — Suíte de integração simulada
+
+**Resultado: Aprovado.**
+
+- Rótulo "SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi)" confirmado
+  presente e destacado em: `tools/T-38-integracao-simulada/Program.cs`
+  (impresso em runtime, visível na evidência bruta),
+  `docs/integracao-simulada/evidencia-execucao-T-38.txt` (linha 3 e repetido
+  a cada bloco de execução), `docs/integracao-simulada/evidencia-execucao-T-39.txt`
+  (linha 4, idem), `docs/integracao-simulada/README.md` (título da Seção,
+  linhas 3 e 9). Em nenhum dos 4 documentos há frase que possa ser lida como
+  "integração real concluída" — confirmado por busca textual dedicada,
+  achado implícito do ADR-010 satisfeito.
+- Critério de aceite técnico de T-38 (venda nova quitada 200; repetição
+  idempotente sem novo histórico P-2; `GET status` reflete o resultado)
+  confirmado pela evidência: Cenário 2 verificado por 2 caminhos
+  complementares (resposta HTTP + contagem de `VendaHistorico` via consulta
+  direta ao banco, 2 registros antes/depois) — verificação mais forte que só
+  comparar o corpo HTTP, correta escolha do Executor. O achado sobre
+  precisão de `TIMESTAMP` (comparação de data por string vs. semântica) é
+  metodológico do próprio harness de evidência, não afeta o comportamento de
+  produção — sem impacto no veredito.
+- Critério de aceite técnico de T-39 (cancelamento Pendente/desconhecida/
+  Quitada sem motivo, reenvio pós-timeout idempotente, 400/401/409)
+  confirmado pela evidência — os 8 cenários (1+2+3+4+5a+5b+5c, com 5b/5c
+  comparados por corpo idêntico) batem com D-06/D-08/P-2 já auditados nos
+  Lotes 4/5 (T-09/T-10) e Lote 6 (T-35, 401 idêntico). Nenhuma divergência
+  registrada por T-39 (confirmado — não havia nada para T-40 corrigir aqui).
+- Harnesses fora da `.sln` (mesma disciplina de `spikes/T-01-firebird-spike`/
+  `tools/T-34-smoke-harness`, já aceita em lotes anteriores) — não fazem
+  parte do build de produção, confirmado por `git diff`/leitura dos
+  `.csproj` da solução (nenhum novo `ProjectReference` a eles).
+- Não reexecutei os harnesses `tools/T-38.../T-39...` eu mesmo nesta
+  validação (não fazem parte de `dotnet vstest`, exigiriam subir Firebird
+  embarcado dedicado fora da suíte) — mesma decisão já tomada na validação
+  de T-34 (Lote 7): conferi que a evidência bruta bate exatamente com o
+  código dos harnesses (`Program.cs` de cada um) e com o comportamento já
+  confirmado pela suíte de integração real (`ApiHostVendas*ControllerTests`),
+  que cobre os mesmos cenários de negócio por outro caminho (xUnit +
+  `ApiHost` real). Sem contradição entre as duas fontes de evidência.
+
+### T-40 — Registro da pendência de integração real
+
+**Resultado: Aprovado.**
+
+- Releitura confirmada: nem T-38 nem T-39 reportaram divergência de
+  comportamento que exigisse correção — a nota "no-op confirmado por
+  leitura" do Executor é precisa, não uma forma de pular trabalho.
+- `docs/integracao-simulada/PENDENCIA-INTEGRACAO-REAL.md` lido por completo:
+  objetivo, lista o que falta (aceite formal T-03, acesso a ambiente/
+  homologação, responsáveis conhecidos/desconhecidos, próximos passos em
+  ordem), e a seção final ("Quando este documento pode ser considerado
+  resolvido") deixa explícito que qualquer "concluído" reportado sobre
+  integração com o Vendas se refere só à suíte simulada — não fecha nem
+  minimiza a pendência, cumpre o critério de aceite da tarefa.
+- `BLOCKERS.md` Bloqueio 002 complementado sem reabertura (status mantido
+  "Resolvido (redesenho de escopo)") — avaliado como correto: a atualização
+  de T-40 é um registro adicional, não uma reversão da decisão do
+  Coordenador; ver "Checagem do `BLOCKERS.md`" na seção de fechamento
+  estrutural abaixo.
+- Suíte completa reexecutada pelo Executor (124/124) e reconfirmada por mim
+  nesta validação (124/124 em 2 rodadas) — marco do Dia 4 fechado nos termos
+  do ADR-010, sem apresentar a integração real como concluída em nenhum
+  lugar checado.
+
+### Testes de integração cruzada (Lote 8)
+
+- `ApiKeyHandler` (T-35) e `HealthController`/isenção (T-36) rodaram em
+  paralelo sobre `Startup.cs` — confirmado por leitura que `Configuration`
+  chama `ConfigurarApiKey` depois de `ConfigurarCorrelationId` e antes de
+  `ConfigurarExceptionHandler`, sem conflito com o registro do controller de
+  T-36 (que não precisa de nenhuma linha em `Startup.cs`, resolvido
+  automaticamente pelo `RegisterApiControllers` de T-30).
+- T-37 depende de T-34 (Lote 7) e T-35 (mesmo lote) — confirmado que a
+  validação byte a byte só pôde ser feita depois de `ApiKeyHandler` estar
+  ativo (os exemplos incluem os 2 cenários 401, que só existem por causa de
+  T-35).
+- T-38 depende de T-30/T-31/T-35/T-36 — confirmado que o harness usa
+  `X-Api-Key` em toda chamada (T-35) e testa quitação/status (T-30/T-31)
+  reais; T-39 depende de T-38/T-32 — confirmado que reaproveita o mesmo
+  padrão de harness e testa cancelamento (T-32) real. As 6 rotas de venda
+  (3 endpoints x 2 bases, T-33, Lote 7) continuam protegidas pelo
+  `ApiKeyHandler` — reforço específico pedido pelo `SECURITY-REVIEW.md` do
+  Lote 7, confirmado satisfeito nesta rodada (ver auditoria de segurança
+  abaixo).
+
+### Requisitos não funcionais
+
+- Dinheiro sempre `decimal`: nenhum valor monetário novo introduzido por
+  este lote (T-35…T-40 não tocam DTOs de valor).
+- Datas UTC: sem mudança nova além do já auditado (T-25/T-30, Lotes 6/7).
+- Sem `async void`: `ApiKeyHandler.SendAsync` é `async Task<...>` (assinatura
+  correta de `DelegatingHandler`), sem violação.
+- Erro ao cliente sem stack trace: 401 do `ApiKeyHandler` usa envelope fixo,
+  nunca ecoa dado do request — confirmado.
+- Performance/UX: fora do escopo (sem tela neste lote).
+
+## Padrão recorrente de bug (escalonamento ao Coordenador)?
+
+**Não.** Zero reprovações (críticas ou simples) neste lote. Nenhum padrão
+recorrente de bug identificado — os únicos "achados" mencionados nas notas
+do Executor (precisão de `TIMESTAMP`, culture de formatação de número,
+encoding de console) são metodológicos/de evidência, não de decomposição de
+tarefas nem de diretriz de implementação. Não escalo ao `coordenador`.
+
+## Fechamento estrutural do Lote 8
+
+Ver `SECURITY-REVIEW.md` (mesma checagem, registrada lá para não duplicar) —
+resumo: todas as 6 tarefas `Concluída`, sem dependência órfã da Seção 4
+relativa ao Lote 8, sem tarefa `Bloqueada` (T-38 não está mais `Bloqueada`,
+foi redecomposta e re-executada, confirmado), `BLOCKERS.md` Bloqueio 002
+coerente (Resolvido, pendência residual clara, não reaberto). Zero achados —
+nenhuma tarefa criada em `Refatoração Lote-8`. Lote fecha **Validado** (sem
+ressalvas) após a auditoria de segurança.
+
+## Lote 9 — Tela de consulta: grid e detalhe
+
+**Veredito: Aprovado com ressalvas (achados simples, sem reprovação).** As 4
+tarefas (T-41, T-42, T-43, T-44) permanecem `Concluída`. Nenhuma reprovação
+crítica. A verificação **visual não foi feita por ninguém** (sandbox sem
+display); é limitação de ambiente já aceita e **não** motivo de reprovação —
+ver "Pendência de conferência visual manual" abaixo.
+
+Validado por leitura do código real (`Formatadores`, `ConfiguracaoVisual`,
+`ConsultaVendasModelo`, `FrmConsulta`, `DetalheVendaModelo`, `FrmDetalheVenda`)
+contra o critério literal de cada linha do `TASK.md` e o `UX-SPEC.md` (2.1,
+2.2, 3, 4), e por **execução independente**: `dotnet build ERPFinanceiro.sln`
+(0 aviso, 0 erro), `bin\x64\Debug\net48` copiado para
+`C:\temp_erp_validar_lote9` (fora do OneDrive) e `dotnet vstest` **4 vezes
+seguidas: 164/164 em todas** (~1 min 3 s cada; 0 falha).
+
+### T-41 — `Formatadores` + base visual: Aprovada (1 ressalva simples)
+- Moeda N2 pt-BR (`1.250,00`), data UTC->local `dd/MM/yyyy HH:mm`, nullable ->
+  "—", status = texto + ícone (sem cor): confirmado no código e nos 13 testes
+  de `FormatadoresTests`. Skin `Office 2019 Colorful` e 3 SVGs 16 px em
+  `ConfiguracaoVisual.cs`.
+- **Ressalva simples RL9-01:** o critério exige "nenhuma cor hardcoded", mas os
+  3 SVGs têm `stroke="#555555"` literal (`ConfiguracaoVisual.cs` linhas 33-36),
+  e o comentário da classe afirma o contrário ("Nenhuma cor hardcoded").
+  Baixo impacto (cinza neutro, skin clara), mas a afirmação é imprecisa e o
+  cinza fixo pode perder contraste numa skin escura. Nenhuma outra cor
+  hardcoded em `src/ERPFinanceiro.Desktop` (`SystemBrushes.GrayText` no vazio
+  é cor de sistema, aceitável).
+
+### T-42 — `FrmConsulta`: Aprovada
+- Colunas do UX-SPEC 2.1 (Venda ID, Cliente ID, Valor total à direita, Status
+  com ícone, Recebida em, Quitada em, Cancelada em oculta/column chooser);
+  `Editable=false`/`ReadOnly=true`; `ShowAutoFilterRow=false`,
+  `AllowFilter=false`; ordenação Recebida em desc; contador "1 venda"/"N
+  vendas"; "—" nos nulos; "Cancelada*" + tooltip + legenda; F5 recarrega;
+  dados via `ConsultaService.Listar` em processo, sem HTTP.
+- `Task.Run` na carga; `async void` só no handler de UI; nenhum `.Result`/
+  `.Wait()`/`GetAwaiter().GetResult()` em `src/ERPFinanceiro.Desktop` (grep).
+  `CarregadorViaContainer` abre `BeginLifetimeScope()` novo por chamada e
+  descarta (`using`): `DbContext` por operação, RT-08/regra 5.
+
+### T-43 — Estados de F-1: Aprovada
+- Textos idênticos ao UX-SPEC 4 (comparados literalmente): vazio, "Carregando
+  vendas...", "Não foi possível consultar o banco." + "Tentar novamente",
+  "Mostrando as 5.000 mais recentes; refine o filtro".
+- Vazio via `CustomDrawEmptyForeground` (único componente custom permitido,
+  Dir. 12); erro com mensagem fixa (`catch (Exception)` descarta a exceção:
+  nunca stack/caminho de `.fdb`); grid mantém dados anteriores esmaecidos.
+  `FrmConsultaEstadosTests` cobre banco vazio, carga bloqueada com `Task`
+  incompleta (UI livre), erro + retry, 5.001 linhas -> 5.000 + aviso.
+
+### T-44 — `FrmDetalheVenda`: Aprovada
+- Cabeçalho + aba **única** "Itens" (aba Histórico ausente), preço N4/subtotal
+  N2, "Total itens: X", texto "Sem itens registrados (venda cancelada sem
+  quitação prévia)" exato do UX-SPEC 2.2; `Esc` = `CancelButton`; falha mostra
+  aviso + "Tentar novamente" sem fechar; duplo clique/Enter -> `AbrirDetalhe()`
+  com foco devolvido à linha. V-1001: 300,00 + 200,50 = 500,50 (teste real).
+- **Dependência conhecida (não é defeito):** `FrmConsulta.DetalhePresenter` só
+  é atribuída pelo composition root (`Program.cs`, T-46); até lá `AbrirDetalhe()`
+  retorna sem abrir nada. Está na nota de T-44, mas **não** nas linhas de
+  T-46/T-51 -> **RL9-02** (simples).
+
+### Diretrizes 12-15 (Seção 1)
+- Dir. 12: `FrmDetalheVenda` usa só `XtraForm`/`LabelControl`/`XtraTabControl`/
+  `SimpleButton`/`ProgressPanel`. **`FrmConsulta` herda de `Form` e usa `Label`/
+  `Panel` do WinForms** (contador, legenda, aviso, host). Não é controle
+  custom, mas é inconsistente entre as telas e com UX-SPEC 3 -> **RL9-03**.
+- Dir. 13: grid/detalhe usam `Formatadores`; só `PrecoUnitario.ToString("N4")`
+  fica em `DetalheVendaModelo` (N4 não existe em `Formatadores`). Observação.
+- Dir. 14/15: 4 estados em F-1 e F-3; em processo via `ConsultaService`, sem
+  HTTP.
+
+### Pendência de conferência visual manual (honestidade do registro)
+Conferidos `TASK.md` (T-41 adendo, T-42, T-43, T-44), `BLOCKERS.md` Bloqueio
+003 ("Resolvido (parcialmente)... verificação visual permanece etapa manual do
+usuário") e comentários de código. **Nenhum afirma "verificado visualmente"**;
+todos listam o que ficou sem ver (aparência/layout, alinhamento do valor,
+ícones, cor da skin, tooltip, F5/Enter/Esc em form exibido, foco visual,
+`ProgressPanel` animando, clique real, truncamento a 1024x600/DPI). Registro
+honesto. Pendência do usuário: rodar a tela numa máquina com GUI antes de
+T-51/T-52/T-53.
+
+### Estabilidade da suíte / intermitência do T-20
+`Harness_ConcorrenciaEIdempotencia_T20` e todos os `ApiHost*` passaram em
+**4/4 execuções completas isoladas (164/164)**. **A falha intermitente do
+T-20 não foi reproduzida**, logo a mensagem de erro não pôde ser capturada.
+Com as ~9 execuções do orquestrador (1 falha), a frequência agregada é ~1 em
+13 (~8%). Sem evidência de causa neste lote: os testes `FrmConsulta*`/
+`FrmDetalhe*` rodam em thread STA própria com `Join` (60-120 s), têm `Dispose`
+e foram estáveis nas 4 rodadas; a hipótese mais provável segue a classe
+pré-existente (RL4-02, `AccessViolationException` do Firebird nativo).
+**Observação, sem reprovação e sem tarefa nova**; se voltar a ocorrer, gravar
+a saída do `vstest` em arquivo para ver a exceção real.
+
+### Bugs / reprovações
+Nenhuma reprovação crítica nem simples de critério de aceite. Achados simples
+(tarefas em `Refatoração Lote-9`): RL9-01 (cor `#555555` nos SVGs), RL9-02
+(fiação de `DetalhePresenter`/presenters no composition root não registrada em
+T-46/T-51), RL9-03 (`FrmConsulta` usa `Form`/`Label`/`Panel` WinForms).
+
+## Padrão recorrente de bug (escalonamento ao Coordenador)?
+
+**Não.** Achados pontuais e de baixa severidade. Não escalo.
+
+## Fechamento estrutural do Lote 9
+
+Ver `SECURITY-REVIEW.md` (mesma checagem, registrada lá). Resumo: 4 tarefas
+`Concluída`, dependências da Seção 4 sem referência quebrada, nenhuma tarefa
+`Bloqueada`; `Refatoração Lote-9` criada (RL9-01…RL9-04, sendo RL9-04 de
+documentação de licença, achado do chapéu DevSecOps). Lote 9 fecha **Validado
+com ressalvas**, com a conferência visual manual do usuário ainda pendente.
+
+## Lote 10 — Tela: status e ciclo de vida
+
+**Veredito: Aprovado com ressalvas (achados simples, sem reprovação).** T-45,
+T-46 e T-47 permanecem `Concluída`. Nenhuma reprovação crítica. Verificação
+visual/ao vivo **não foi feita por ninguém** (sem display): limitação de
+ambiente aceita, não motivo de reprovação; nenhum artefato afirma "verificado
+visualmente" (as notas registram a pendência do usuário).
+
+Validado por leitura do código real (`BarraStatusPresenter`,
+`BarraStatusVisual`, `SequenciaInicializacao`, `InstanciaUnica`,
+`TextosInicializacao`, `Program`, `ComposicaoJanelaPrincipal`,
+`EncerramentoAplicacao`, `FrmConsulta`, `ConfiguracaoVisual`, `ApiHost`) e dos
+testes `BarraStatusTests`, `EncerramentoTests` contra o critério literal do
+`TASK.md` e o UX-SPEC (2.4, 2.7, 3, 4, 5), e por **execução independente**:
+`dotnet build ERPFinanceiro.sln` (0 aviso, 0 erro); `bin\x64\Debug\net48`
+copiado para `C:\temp_erp_validar_lote10`; `dotnet vstest` 7 vezes:
+**188/188 em 6 execuções; 1 falha** (ver "Estabilidade da suíte").
+
+### T-45 — Barra de status F-6: Aprovada
+- Textos idênticos ao UX-SPEC 2.4: `API: Ativa (http://localhost:porta)`,
+  `API: Inativa - porta em uso`, `API: Iniciando...`, `Banco: OK`,
+  `Banco: indisponível`; ícone SVG + texto sempre (nunca só cor). Independência
+  API/Banco testada.
+- Health check: `await Task.Run(() => _health.ObterStatus())`; nenhum
+  `.Result`/`.Wait()`; flag `_emAndamento` sob `lock` impede empilhar; exceção
+  do health vira "Banco: indisponível" (observada). Tick do `Timer` WinForms
+  chega na UI thread; timer injetável (`ITemporizador`) e teste com timer fake.
+- Diálogo: porta, caminho `.fdb`, último erro, **Copiar** (via
+  `IAreaTransferencia`), Esc fecha. Clique atualiza e abre.
+- Ressalva (RL10-01): `BarStaticItem` não é focável por Tab, o diálogo só abre
+  com mouse (UX-SPEC 5 "nenhuma ação exclusiva de mouse"). Vai para T-51.
+
+### T-46 — Inicialização F-7: Aprovada
+- Splash `Iniciando banco e API...`, aviso `Já existe uma instância em
+  execução` e diálogo de API (causa + ação + Sim/Não) conforme UX-SPEC; falha
+  de config antes da sequência mostra mensagem (`return 2`), nunca sai calado.
+- Mutex `Global\ERPFinanceiro.Desktop.InstanciaUnica` (constante de produção;
+  testes usam nomes próprios). Criado e liberado na thread `Main` (STA): sem
+  `AbandonedMutexException` (o construtor `new Mutex(true,...)` não lança por
+  abandono; processo morto libera o mutex pelo SO). Segunda instância retorna
+  antes de banco/API (teste). `Dispose` idempotente; `finally` do `Program`
+  repete `host.Stop()`/`Dispose` sem efeito (idempotentes).
+- Banco em erro: janela abre e a carga cai no estado de erro F-1.
+- Ressalva (RL10-03): mutex `Global\` criado por outro usuário/sessão pode dar
+  `UnauthorizedAccessException` (mensagem "Não foi possível iniciar" em vez do
+  aviso de segunda instância). Baixo.
+- Nota de T-46 ainda diz "T-47 não implementada" (desatualizada; RL10-05).
+
+### T-47 — Encerramento: Aprovada
+- Texto literal `Fechar encerra a API; o ERP Vendas não conseguirá enviar
+  vendas.`, `XtraMessageBox` Sim/Não, título "ERP Financeiro", ícone Warning.
+- Ordem barra/timer -> `ApiHost.Stop` -> `container.Dispose` -> mutex;
+  `Encerrar` idempotente sob `lock`; cada passo capturado (falha não pula os
+  seguintes); testes: ordem, falha de passo, 2x. "Não" -> `e.Cancel`, API
+  `Ativa` e timer não parado (teste com `ApiHost` e Firebird reais); "Sim"
+  libera porta (novo `HttpListener` sobe) e `.fdb` (`FileShare.None`).
+  Desligamento do Windows/Gerenciador de Tarefas não pergunta.
+- **Foco padrão "Não"** (`MessageBoxDefaultButton.Button2` em YesNo = Não):
+  aceitável (ação segura, evita derrubar a API por Enter), documentado no
+  código e na nota de T-47; falta registrar no UX-SPEC (RL10-05, doc).
+- Ressalva (RL10-02): o logger é descartado com o container, então falhas dos
+  passos posteriores do `Encerrar` são perdidas.
+
+### Pontos específicos pedidos
+- **`ApiHost` "só como fonte de estado"** (`host ?? new ApiHost(raiz)`): o
+  construtor só guarda o container; nenhum `Start`, listener, porta ou
+  `DbContext` (RT-08 preservado). Na prática `host` sempre é atribuído em
+  `iniciarApi` antes; o fallback é código morto inofensivo. **Sem achado.**
+- **Sem cor hardcoded:** `grep '#[0-9A-Fa-f]{6}' src/ERPFinanceiro.Desktop`
+  sem ocorrência. Sem `System.Windows.Forms.Label/Panel` em `FrmConsulta`
+  (herda `XtraForm`, usa `LabelControl`/`PanelControl`).
+- **`Program.Main` e exceções não tratadas:** não há
+  `Application.ThreadException`/`AppDomain.UnhandledException`. Não é critério
+  do TASK.md: **observação** (RL10-02a).
+- **Fire-and-forget:** `var _ = AtualizarAsync()` no `Tick`/`Iniciar`: health
+  observado internamente; exceção de um handler de `Alterado` (ex. UI já
+  descartada após fechar) ficaria não observada. Observação (RL10-02c).
+
+### Refatorações do Lote 9 (achados de origem do meu relatório do Lote 9)
+- **RL9-02 — resolvida (`Concluída`):** `Program` cria presenters via
+  `CarregadorViaContainer`, atribui `FrmConsulta.DetalhePresenter`, chama
+  `AplicarSkin()` antes do splash e liga `Action<Exception> aoFalhar` ao
+  `IAppLogger` (exceção completa só no log; a tela mantém mensagem fixa).
+- **RL9-03 — resolvida (`Concluída`):** confirmado por leitura e grep.
+- **RL9-04 — resolvida (`Concluída`):** ver `SECURITY-REVIEW.md`.
+- **RL9-01 — permanece `Em andamento` (correto):** cores literais removidas
+  (grep limpo). SVGs `class="Black"` sem `<style>` próprio: pela convenção de
+  ícones SVG DevExpress a classe é resolvida pela paleta da skin ("Black"
+  mapeia para a cor de texto/glifo); fallback é preenchimento preto, legível
+  na skin clara escolhida (Office 2019 Colorful). Risco baixo; só a
+  conferência visual do usuário fecha (não verifiquei a paleta em runtime).
+
+### Estabilidade da suíte
+7 execuções completas isoladas: 188/188 (6x). Uma falha (run 1):
+`ApiHostVendasStatusControllerTests.GetStatus_PipelineHttpCompletoComContainerRealEFirebirdReal_CobreOsCenariosDoContratoV11`
+-> `Assert.Equal() Failure: Expected: OK / Actual: NotFound`
+(`ApiHostVendasStatusControllerTests.cs:139`, cenário 1: venda semeada
+diretamente no `.fdb` não encontrada pela API). É teste do **Lote 8**, não usa
+código do Lote 10 (sem STA/timer/mutex); `Harness_..._T20` não falhou.
+Ressalva de honestidade: antes das execuções em primeiro plano disparei uma
+execução em segundo plano que terminou sem saída útil; não posso descartar
+sobreposição na run 1. Classificação: intermitência pré-existente, não
+causada por este lote. Tarefa RL10-06 (capturar e investigar).
+
+### Bugs / reprovações
+Nenhuma reprovação crítica ou simples de critério de aceite. Achados simples
+em `Refatoração Lote-10`: RL10-01 (teclado), RL10-02 (robustez ciclo de vida),
+RL10-03 (mutex multiusuário), RL10-04 (ver segurança), RL10-05 (doc), RL10-06
+(intermitência).
+
+## Padrão recorrente de bug (escalonamento ao Coordenador)?
+
+**Não.** Achados pontuais, baixa severidade. Não escalo.
+
+## Fechamento estrutural do Lote 10
+
+Ver `SECURITY-REVIEW.md`. Lote 10 fecha **Validado com ressalvas**, com a
+conferência visual/ao vivo do usuário pendente.

@@ -160,3 +160,146 @@
   fora do OneDrive (0x80131515), que segue necessário para as próximas
   tarefas BE com execução real contra `.fdb`/testes de integração nesta
   máquina/worktree.
+
+## Bloqueio 002 — 23/09/2026
+- Reportado por: orquestrador (`/executar --continuar`), ao recalcular a fila do
+  Lote 8 após T-35/T-36/T-37 fecharem `Concluída`
+- Escalado para: usuário (orquestrador) — dependência externa ao alcance de
+  qualquer agente deste sandbox, não é um problema de código/SDD.md/UX-SPEC.md
+- Artefato/trecho afetado: `.md/TASK.md`, Lote 8, linhas T-38 e T-39
+- Descrição: **T-38** ("Integração real com o Vendas (Delphi): quitação e
+  consulta de status disparadas pelo Vendas real") depende de T-03 ("aceite do
+  Vendas") e de acesso real ao sistema Vendas (Delphi) — nenhum dos dois está
+  disponível neste ambiente. `T-03` já registrou (22/09/2026) que o envio do
+  `docs/contrato-v1.1.md` ao lado Vendas e o aceite ponto a ponto **não foram
+  realizados** ("sem acesso ao Vendas neste ambiente"); a própria linha de T-38
+  já antecipa essa possibilidade ("Se contrato v1.1 não foi aceito: usar v1.0 e
+  registrar bloqueio em BLOCKERS.md"). Além do aceite pendente, T-38 pede uma
+  ação disparada pelo sistema Vendas real (Delphi) contra esta API — não é
+  algo que um Executor consiga simular de forma fiel sem o outro lado real (T-39
+  depende de T-38 e tem a mesma natureza: "cada cenário executado no Vendas
+  real").
+- Impacto se não resolvido: Lote 8 não fecha (T-38/T-39 seguem `A fazer`);
+  `/executar --continuar` não consegue validar o Lote 8 nem avançar para lotes
+  seguintes que dependam dele (T-40 em diante, ver Seção 4 do TASK.md). Todo o
+  restante do Lote 8 (T-35, T-36, T-37) e do Lote 7 (T-30…T-34) está
+  `Concluída`/`Validado`, sem bloqueio.
+- Sugestão: usuário decide entre (a) obter o aceite do Vendas e agendar a
+  integração real fora deste sandbox (ambiente com acesso ao sistema Delphi),
+  (b) destacar T-38/T-39 como pendência de outro time/ambiente e seguir
+  `/executar`/`/validar` nos lotes seguintes que não dependam delas (checar
+  Seção 4 do TASK.md antes), ou (c) redefinir o escopo de T-38/T-39 com o
+  Coordenador caso a integração real não seja viável dentro do prazo do
+  projeto.
+- **Decisão do Coordenador (23/09/2026, chapéu Tech Lead/Software Architect,
+  opção (c) acima, registrada em `.md/adr/010-integracao-vendas-simulada-sem-acesso-delphi.md`):**
+  - Conferida a Seção 4 do `TASK.md` antes de decidir: **nenhuma tarefa dos
+    Lotes 9, 10, 11 ou 12 depende de T-38/T-39/T-40** (dependem de T-04,
+    T-12, T-22…T-24, T-26, T-27, T-41, T-42 — todas já `Concluída`/`Validado`
+    ou liberadas). A única dependência real encadeada é `T-53` (Lote 13,
+    empacotamento) -> `T-40` -> `T-39` -> `T-38`. Ou seja, o bloqueio não
+    travava a tela/relatório/acessibilidade, só o fechamento final de
+    empacotamento/entrega.
+  - O marco "API utilizável pelo Vendas" (fim do Dia 3, Lote 7) **já foi
+    cumprido** e não é afetado por esta decisão (Lote 7 `Validado`, sem
+    dependência de T-38/T-39).
+  - O marco "O-11" do Dia 4, por outro lado, **muda de significado**: deixa
+    de ser "integração real confirmada com o Vendas" e passa a ser
+    "confiança técnica validada por suíte de integração **simulada**
+    (harness HTTP real reaproveitando o padrão de T-34/T-37); integração
+    real com o Delphi permanece pendência externa explícita". Essa mudança
+    de escopo do marco **é sinalizada ao usuário para aprovação explícita**
+    antes de o Executor ser disparado sobre os novos T-38/T-39 — não é uma
+    decisão que o Coordenador aprova sozinho (guardrail: trade-off de alto
+    impacto em escopo/entrega vai para o usuário).
+  - `TASK.md` atualizado (Lote 8: T-38, T-39, T-40 redefinidas + nota de
+    cabeçalho do lote; Seção 2: nota de risco; Seção 4.3: matriz de
+    premissas; Seção 6: item 10, novo). Redecomposição cirúrgica — só as
+    3 linhas de tarefa + notas de seção tocadas, sem redesenhar o resto do
+    plano.
+  - **Pendência residual, não fechada por esta decisão:** integração real
+    com o sistema Vendas (Delphi) e aceite formal do `docs/contrato-v1.1.md`
+    continuam **em aberto**, fora do alcance deste sandbox. Deve ser
+    retomada em ambiente com acesso ao sistema Delphi real, e documentada
+    como limitação conhecida em T-54 (README) e como risco/dívida técnica
+    aceita no `SDD.md` antes da entrega final (Lote 13). Se o usuário
+    entender que essa pendência é um gate obrigatório para "concluir o
+    projeto" (não apenas para os agentes deste sandbox), isso é decisão de
+    negócio do usuário/Gestor, não do Coordenador.
+- **Atualização (23/09/2026, executor chapéu BE, T-40):** T-38/T-39 executados
+  e `Concluída` — ambos reportaram **zero divergências** de comportamento nos
+  cenários simulados (nada a corrigir por T-40). Confirmado que a "pendência
+  residual" descrita acima já deixava claro que a integração real permanece em
+  aberto; para dar a ela um registro dedicado e acionável (não só narrativo),
+  foi criado `docs/integracao-simulada/PENDENCIA-INTEGRACAO-REAL.md`, listando
+  objetivamente o que falta (aceite formal de `docs/contrato-v1.1.md` pelo
+  time Vendas — T-03; acesso a um ambiente com o Vendas/Delphi real ou
+  homologação conjunta; responsáveis/próximos passos conhecidos e
+  desconhecidos). Este documento é o que `T-54` (README final, ainda não
+  criado nesta sessão) deve linkar/incorporar. Bloqueio **não reaberto** — a
+  pendência residual continua sendo tratada como item explícito em aberto, não
+  como bloqueio ativo de execução (nenhum lote/tarefa Tier A depende dela
+  além do já concluído `T-40`).
+- Status: **Resolvido (redesenho de escopo) — pendência residual de
+  integração real com o Vendas permanece aberta, fora do alcance deste
+  sandbox; suíte simulada T-38/T-39/T-40 concluída sem divergências; detalhe
+  acionável da pendência registrado em
+  `docs/integracao-simulada/PENDENCIA-INTEGRACAO-REAL.md`.**
+
+## Bloqueio 003 — 23/09/2026
+- Reportado por: orquestrador (`/executar --continuar`), ao recalcular a fila
+  após T-41 (Lote 9) fechar `Concluída`
+- Escalado para: usuário (orquestrador) — limitação de ambiente sem dono de
+  artefato claro (não é um problema de SDD.md/UX-SPEC.md/TASK.md em si)
+- Artefato/trecho afetado: `.md/TASK.md`, Lotes 9-12 (T-42 a T-52) — praticamente
+  todo o restante do Frontend/Desktop do projeto
+- Descrição: **DevExpress WinForms trial não está instalado/instalável neste
+  sandbox** (já confirmado em T-02: "sandbox sem GUI/instalador interativo"; em
+  T-04: "feed licenciado nuget.devexpress.com, não instalável neste ambiente";
+  reconfirmado agora em T-41, que só conseguiu implementar a fatia sem
+  DevExpress do seu escopo — `Formatadores`, lógica pura — deixando a parte de
+  skin/ícones SVG documentada como pendência, sem simular a API). T-42
+  (`FrmConsulta`, `GridControl` DevExpress somente leitura) é a próxima tarefa
+  elegível do Lote 9 e **não tem fatia sem-DevExpress equivalente à de T-41** —
+  é fundamentalmente uma tela WinForms com `GridControl` real. O mesmo vale
+  para praticamente todo o restante: T-43/T-44 (Lote 9), T-45/T-46/T-47
+  (Lote 10), T-49/T-50 (Lote 11, FastReport/preview), T-51/T-52 (Lote 12,
+  acessibilidade de tela real) — todas dependem de renderizar/testar UI
+  WinForms de verdade, sem GUI interativa neste ambiente. T-48 (Lote 11,
+  `RelatorioDataSource`) é a exceção parcial: é lógica de Application/Reports
+  sem UI direta, pode não sofrer do mesmo bloqueio (a confirmar quando chegar a
+  vez dela).
+- Impacto se não resolvido: nenhuma tela real pode ser implementada nem
+  verificada por execução real (Diretriz 16) neste sandbox — só inspeção
+  estrutural/código sem renderização, o que quebraria o padrão de evidência
+  real já estabelecido em todo o projeto até aqui (Lotes 1-8, todos com
+  execução real confirmada). Forçar a implementação sem poder rodar/ver a UI
+  arriscaria produzir código não verificado apresentado como "concluído".
+- Sugestão: usuário decide entre (a) disponibilizar um ambiente com GUI
+  interativa e o instalador do DevExpress WinForms trial para uma sessão
+  futura de `/executar` continuar o Frontend, (b) autorizar uma abordagem
+  alternativa (ex.: Coordenador reavalia se algum subconjunto de T-42+ pode
+  ser implementado/testado sem DevExpress real — improvável dado que a
+  diretriz 12 da Seção 1 do TASK.md exige "só controles DevExpress padrão"),
+  ou (c) pausar a fila de execução no Frontend e priorizar outras frentes
+  (ex. T-48/T-53+ que não dependam de UI renderizada) até o ambiente estar
+  disponível.
+- **Atualização (23/09/2026, orquestrador):** usuário escolheu (c) e, depois,
+  ao consultar a página oficial de trial da DevExpress, foi identificado que os
+  pacotes DevExpress WinForms trial (30 dias) estão disponíveis no **nuget.org
+  público** (ex.: `DevExpress.Win.Grid` 25.1.x/26.1.x, verificado pela
+  DevExpress). Teste no sandbox: projeto `net48` descartável com
+  `PackageReference Include="DevExpress.Win.Grid"` **restaurou e compilou**
+  (`GridControl` resolvido), só com warnings `DX1000/DX1001` ("For evaluation
+  purposes only", esperados no trial). Isso **corrige a premissa de T-02/T-04**
+  ("feed licenciado nuget.devexpress.com, não instalável aqui"). A limitação
+  real que permanece é apenas **verificação visual**: este sandbox não tem
+  display, então layout/cores/ícones/acessibilidade (incl. T-52, Narrador)
+  exigem conferência manual do usuário numa máquina com GUI. Compilação e
+  testes não-visuais (configuração de colunas, binding, formatação,
+  eventualmente instanciação headless de controles) são viáveis aqui.
+  Nota de cronograma: trial de 30 dias; início do relógio no modo NuGet não
+  confirmado.
+- Status: Resolvido (parcialmente) — compilação/testes não-visuais liberados;
+  verificação visual permanece etapa manual do usuário. Fila de Frontend
+  (T-42 em diante) retomada em 23/09/2026.

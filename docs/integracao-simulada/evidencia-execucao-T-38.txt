@@ -1,0 +1,159 @@
+# Evidência de execução real — T-38 (23/09/2026)
+#
+# ============================================================================
+# SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi).
+# Este documento registra a execução de um harness HTTP (papel do "Vendas")
+# contra a API local, não uma integração com o sistema Vendas em Delphi real.
+# Ver ADR-010 (.md/adr/010-integracao-vendas-simulada-sem-acesso-delphi.md) e
+# .md/BLOCKERS.md Bloqueio 002. A integração real com o Vendas permanece
+# pendência externa explícita, fora do alcance deste sandbox.
+# ============================================================================
+#
+# App local real: ApiHost + Startup + CompositionRoot.Construir() (mesmo caminho de produção de
+# T-26/T-27/T-30/T-31/T-32/T-35/T-36/T-37) subido por um harness dedicado a T-38
+# (tools/T-38-integracao-simulada/), reaproveitando o mesmo padrão de tools/T-34-smoke-harness/
+# (T-34/T-37) — não é a mesma instância física, é um novo pequeno console descartável seguindo a
+# mesma disciplina (não faz parte da ERPFinanceiro.sln), com uma diferença deliberada: em vez de
+# ficar no ar esperando curl externo, ele mesmo dispara as chamadas via HttpClient real (papel do
+# Vendas) e consulta o Firebird diretamente (VendaRepository/FinanceiroDbContext) para confirmar
+# objetivamente a ausência de novo histórico na repetição (P-2) — o HTTP por si só não expõe o
+# histórico da venda, então a checagem em banco é necessária para o critério de aceite "sem novo
+# histórico" (não é suficiente inferir isso só pela resposta HTTP).
+#
+# Firebird 3.0 embarcado real (mesmas DLLs nativas usadas pelos testes de integração de
+# T-30/T-31/T-32 e pelos harnesses de T-34/T-37 nesta worktree — fbclient.dll/fbembed.dll/
+# security3.fdb/plugins//intl/, copiadas de src/ERPFinanceiro.Tests/bin/Debug/net48). Build do
+# harness (`dotnet build`) feito de dentro do worktree (OneDrive) sem erro; execução do binário
+# (T38IntegracaoSimulada.exe) feita fora do OneDrive (C:\temp_erp_t38\net48), mesmo contorno do
+# Bloqueio 001 (BLOCKERS.md). Porta 5038 (dedicada, distinta de 5034 usada por T-34/T-37), banco
+# dedicado C:\ERPFinanceiro\data\financeiro_t38_simulado.fdb (apagado e recriado a cada execução
+# do harness, estado limpo por execução). X-Api-Key: CHAVE_LOCAL_SIMULADA_T38 (App.config local
+# do harness, gitignorado — só o .example é versionado, mesma convenção de T-04/T-34).
+#
+# Cada cenário abaixo foi de fato EXECUTADO (Diretriz 16 da Seção 1 do TASK.md — evidência de
+# execução real, não inspeção estática), 2 vezes seguidas contra 2 instâncias novas e limpas do
+# harness (vendaId único por execução, timestamp), ambas 4/4 verificações OK.
+
+═══════════════════════════════════════════════════════════════════════════════
+EXECUÇÃO 1/2
+═══════════════════════════════════════════════════════════════════════════════
+
+================================================================================
+[T38] SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi). Harness HTTP fazendo o papel do Vendas contra a API local (ADR-010).
+================================================================================
+[T38] Inicializando banco (.fdb) via DbInitializer...
+[T38] API ATIVA em http://localhost:5038/ (papel do Vendas simulado por este harness)
+
+--- Cenário: 1. Quitação — venda nova (caminho feliz) ---
+REQUEST:
+  POST http://localhost:5038/api/vendas/quitacao
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T38
+  Content-Type: application/json
+  Body: {"vendaId":"V-T38-SIM-1790182409","clienteId":"C-T38-SIM-1","valorTotal":300.00,"itens":[{"produtoId":"P-T38-A","quantidade":2,"precoUnitario":100.00},{"produtoId":"P-T38-B","quantidade":1,"precoUnitario":100.00}]}
+RESPONSE:
+  HTTP 200
+  Body: {"status":"Quitada","dataQuitacao":"2026-09-23T16:53:30.946492Z"}
+   [OK] HTTP 200, status=Quitada, dataQuitacao=2026-09-23T16:53:30.946492Z
+   [DB]  Consulta direta ao banco (VendaHistorico) apos cenario 1: 2 registro(s) (esperado 2: Recebida + Quitacao, D-04/CriarPorQuitacao).
+
+--- Cenário: 2. Quitação — repetição do mesmo vendaId/payload (idempotência P-2) ---
+REQUEST:
+  POST http://localhost:5038/api/vendas/quitacao
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T38
+  Content-Type: application/json
+  Body: {"vendaId":"V-T38-SIM-1790182409","clienteId":"C-T38-SIM-1","valorTotal":300.00,"itens":[{"produtoId":"P-T38-A","quantidade":2,"precoUnitario":100.00},{"produtoId":"P-T38-B","quantidade":1,"precoUnitario":100.00}]}
+RESPONSE:
+  HTTP 200
+  Body: {"status":"Quitada","dataQuitacao":"2026-09-23T16:53:30.9464Z"}
+   [OK] HTTP 200, status=Quitada, dataQuitacao semanticamente inalterada (diferença 0,092 ms, dentro da tolerância de precisão TIMESTAMP do Firebird) - confirma que Venda.Quitar() retornou false (idempotente, RN-04) sem sobrescrever DataQuitacao.
+   [NOTA] DIVERGÊNCIA DE PRECISÃO (não é violação de P-2): dataQuitacao1='2026-09-23T16:53:30.946492Z' (precisão de tick, valor recém-criado em memória) vs dataQuitacao2='2026-09-23T16:53:30.9464Z' (mesmo instante, após round-trip por TIMESTAMP do Firebird, que só guarda 4 dígitos de fração de segundo) - mesmo instante, string diferente pelos dígitos finais.
+   [DB]  Consulta direta ao banco (VendaHistorico) apos cenario 2 (repeticao): 2 registro(s).
+   [OK] Contagem de VendaHistorico inalterada (2 -> 2) - repeticao NAO gerou novo historico (P-2 confirmado por consulta direta ao banco).
+
+--- Cenário: 3. GET status — reflete o resultado da quitação ---
+REQUEST:
+  GET http://localhost:5038/api/vendas/V-T38-SIM-1790182409/status
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T38
+RESPONSE:
+  HTTP 200
+  Body: {"vendaId":"V-T38-SIM-1790182409","status":"Quitada"}
+   [OK] HTTP 200, vendaId e status refletem o resultado da quitação (Quitada).
+
+================================================================================
+[T38] Resultado: 4/4 verificações OK.
+[T38] SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi). Harness HTTP fazendo o papel do Vendas contra a API local (ADR-010).
+================================================================================
+Código de saída do processo: 0
+
+═══════════════════════════════════════════════════════════════════════════════
+EXECUÇÃO 2/2 (nova instância limpa do harness, novo .fdb, vendaId novo por timestamp)
+═══════════════════════════════════════════════════════════════════════════════
+
+================================================================================
+[T38] SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi). Harness HTTP fazendo o papel do Vendas contra a API local (ADR-010).
+================================================================================
+[T38] Inicializando banco (.fdb) via DbInitializer...
+[T38] API ATIVA em http://localhost:5038/ (papel do Vendas simulado por este harness)
+
+--- Cenário: 1. Quitação — venda nova (caminho feliz) ---
+REQUEST:
+  POST http://localhost:5038/api/vendas/quitacao
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T38
+  Content-Type: application/json
+  Body: {"vendaId":"V-T38-SIM-1790182418","clienteId":"C-T38-SIM-1","valorTotal":300.00,"itens":[{"produtoId":"P-T38-A","quantidade":2,"precoUnitario":100.00},{"produtoId":"P-T38-B","quantidade":1,"precoUnitario":100.00}]}
+RESPONSE:
+  HTTP 200
+  Body: {"status":"Quitada","dataQuitacao":"2026-09-23T16:53:39.4401994Z"}
+   [OK] HTTP 200, status=Quitada, dataQuitacao=2026-09-23T16:53:39.4401994Z
+   [DB]  Consulta direta ao banco (VendaHistorico) apos cenario 1: 2 registro(s) (esperado 2: Recebida + Quitacao, D-04/CriarPorQuitacao).
+
+--- Cenário: 2. Quitação — repetição do mesmo vendaId/payload (idempotência P-2) ---
+REQUEST:
+  POST http://localhost:5038/api/vendas/quitacao
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T38
+  Content-Type: application/json
+  Body: {"vendaId":"V-T38-SIM-1790182418","clienteId":"C-T38-SIM-1","valorTotal":300.00,"itens":[{"produtoId":"P-T38-A","quantidade":2,"precoUnitario":100.00},{"produtoId":"P-T38-B","quantidade":1,"precoUnitario":100.00}]}
+RESPONSE:
+  HTTP 200
+  Body: {"status":"Quitada","dataQuitacao":"2026-09-23T16:53:39.4401Z"}
+   [OK] HTTP 200, status=Quitada, dataQuitacao semanticamente inalterada (diferença 0,0994 ms, dentro da tolerância de precisão TIMESTAMP do Firebird) - confirma que Venda.Quitar() retornou false (idempotente, RN-04) sem sobrescrever DataQuitacao.
+   [NOTA] DIVERGÊNCIA DE PRECISÃO (não é violação de P-2): dataQuitacao1='2026-09-23T16:53:39.4401994Z' (precisão de tick, valor recém-criado em memória) vs dataQuitacao2='2026-09-23T16:53:39.4401Z' (mesmo instante, após round-trip por TIMESTAMP do Firebird, que só guarda 4 dígitos de fração de segundo) - mesmo instante, string diferente pelos dígitos finais.
+   [DB]  Consulta direta ao banco (VendaHistorico) apos cenario 2 (repeticao): 2 registro(s).
+   [OK] Contagem de VendaHistorico inalterada (2 -> 2) - repeticao NAO gerou novo historico (P-2 confirmado por consulta direta ao banco).
+
+--- Cenário: 3. GET status — reflete o resultado da quitação ---
+REQUEST:
+  GET http://localhost:5038/api/vendas/V-T38-SIM-1790182418/status
+  X-Api-Key: CHAVE_LOCAL_SIMULADA_T38
+RESPONSE:
+  HTTP 200
+  Body: {"vendaId":"V-T38-SIM-1790182418","status":"Quitada"}
+   [OK] HTTP 200, vendaId e status refletem o resultado da quitação (Quitada).
+
+================================================================================
+[T38] Resultado: 4/4 verificações OK.
+[T38] SIMULAÇÃO — NÃO é integração real com o Vendas (Delphi). Harness HTTP fazendo o papel do Vendas contra a API local (ADR-010).
+================================================================================
+Código de saída do processo: 0
+
+---
+
+# Nota sobre a "DIVERGÊNCIA DE PRECISÃO" observada acima (não bloqueante, achado desta tarefa):
+# A primeira resposta de quitação devolve `dataQuitacao` com a precisão de tick do .NET (até 7
+# dígitos de fração de segundo, ex. "946492" ou "4401994"), valor calculado em memória no
+# instante da quitação. Ao repetir a mesma quitação (cenário 2), o serviço relê a Venda do banco
+# antes de decidir que já está Quitada (idempotência, RN-04/Venda.Quitar()) e o valor de
+# DataQuitacao devolvido nessa segunda resposta já passou por um round-trip pela coluna
+# TIMESTAMP do Firebird, que só armazena 4 dígitos de fração de segundo (100 microssegundos) —
+# por isso a string bruta difere nos últimos dígitos (ex. "946492" vira "9464") mesmo
+# representando o MESMO instante gravado (diferença < 0,1 ms nas duas execuções acima, muito
+# abaixo da tolerância de 1 ms usada pelo harness para distinguir "mesmo instante com precisão
+# truncada" de "quitação genuinamente nova"). Isto NÃO é uma violação do critério de idempotência
+# P-2 — a prova definitiva e inequívoca de "sem novo histórico" é a contagem de VendaHistorico
+# consultada diretamente no banco (2 -> 2 nas duas execuções), não a string bruta de
+# dataQuitacao. Registrado aqui como observação, sem alteração de código (fora do escopo desta
+# tarefa de QA) — mesma disciplina de T-37 ("observação registrada sem alterar código").
+
+# Pasta temporária C:\temp_erp_t38 (build copiado para fora do OneDrive, contorno do Bloqueio
+# 001) e o banco C:\ERPFinanceiro\data\financeiro_t38_simulado.fdb removidos ao final desta
+# sessão.

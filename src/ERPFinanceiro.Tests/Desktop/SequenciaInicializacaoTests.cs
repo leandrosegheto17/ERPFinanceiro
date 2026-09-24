@@ -183,6 +183,19 @@ namespace ERPFinanceiro.Tests.Desktop
         }
 
         [Fact]
+        public void Mutex_AcessoNegado_TratadoComoSegundaInstancia()
+        {
+            InstanciaUnica r = InstanciaUnica.TentarAdquirir("qualquer",
+                (string n, out bool c) => throw new UnauthorizedAccessException());
+            Assert.Null(r);
+
+            // null => adquirirInstancia false => decisão de segunda instância (Program exibe "Já existe uma instância em execução").
+            var seq = new SequenciaInicializacao(() => r != null, () => { },
+                p => new ResultadoInicioApi(EstadoApiHost.Ativa, null));
+            Assert.Equal(DecisaoInicializacao.SairSegundaInstancia, seq.Executar(5000).Decisao);
+        }
+
+        [Fact]
         public void NomeMutexProducao_EConstanteGlobalDocumentada()
         {
             Assert.StartsWith(@"Global\", InstanciaUnica.NomeMutexProducao);

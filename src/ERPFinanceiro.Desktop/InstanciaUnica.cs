@@ -22,12 +22,35 @@ namespace ERPFinanceiro.Desktop
             _mutex = mutex;
         }
 
+        /// <summary>Fábrica de mutex (seam de teste): devolve o mutex e se foi criado por esta chamada.</summary>
+        public delegate Mutex FabricaMutex(string nome, out bool criado);
+
         /// <summary>Devolve a posse do mutex, ou <c>null</c> se outro processo/instância já a detém.</summary>
         public static InstanciaUnica TentarAdquirir(string nome)
         {
-            if (string.IsNullOrWhiteSpace(nome)) throw new ArgumentException("Nome do mutex obrigatório.", nameof(nome));
+            return TentarAdquirir(nome, (string n, out bool c) => new Mutex(true, n, out c));
+        }
 
-            var mutex = new Mutex(true, nome, out bool criado);
+        /// <summary>
+        /// Com fábrica injetável. <see cref="UnauthorizedAccessException"/> (mutex <c>Global\</c> criado por
+        /// outro usuário/sessão) conta como segunda instância: devolve <c>null</c> (RL10-03).
+        /// </summary>
+        public static InstanciaUnica TentarAdquirir(string nome, FabricaMutex fabrica)
+        {
+            if (string.IsNullOrWhiteSpace(nome)) throw new ArgumentException("Nome do mutex obrigatório.", nameof(nome));
+            if (fabrica == null) throw new ArgumentNullException(nameof(fabrica));
+
+            Mutex mutex;
+            bool criado;
+            try
+            {
+                mutex = fabrica(nome, out criado);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
+            }
+
             if (!criado)
             {
                 mutex.Dispose();

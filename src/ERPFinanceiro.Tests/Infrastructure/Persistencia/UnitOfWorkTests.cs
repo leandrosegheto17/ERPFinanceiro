@@ -201,6 +201,64 @@ namespace ERPFinanceiro.Tests.Infrastructure.Persistencia
             }
         }
 
+        [Fact]
+        public void EhViolacaoDeUniqueVendaId_ExcecaoRealDoFirebird_ExpoeCodigosLocaleIndependentes()
+        {
+            var recebimentoUtc = new DateTime(2026, 9, 21, 10, 0, 0, DateTimeKind.Utc);
+            using (var conn = AbrirConexao())
+            using (var ctx = new FinanceiroDbContext(conn))
+            {
+                new VendaRepository(ctx).Adicionar(Venda.CriarPendente("V-RL401", "C1", 10m,
+                    new[] { new VendaItem("P1", 1, 10.0000m) }, recebimentoUtc));
+                new UnitOfWork(ctx).SalvarAlteracoes();
+            }
+
+            using (var conn = AbrirConexao())
+            using (var ctx = new FinanceiroDbContext(conn))
+            {
+                new VendaRepository(ctx).Adicionar(Venda.CriarPendente("V-RL401", "C2", 20m,
+                    new[] { new VendaItem("P2", 1, 20.0000m) }, recebimentoUtc));
+                var ex = Assert.ThrowsAny<DbUpdateException>(() => ctx.SaveChanges());
+
+                FbException fb = null;
+                for (Exception e = ex; e != null && fb == null; e = e.InnerException) fb = e as FbException;
+                Assert.NotNull(fb);
+                Assert.Equal(335544665, fb.ErrorCode);
+                Assert.Equal("23000", fb.SQLSTATE);
+                Assert.True(UnitOfWork.EhViolacaoDeUniqueVendaId(ex));
+            }
+        }
+
+        [Fact]
+        public void EhViolacaoDeUniqueVendaId_MensagemSemTextoIngles_DetectaPorErrorCode()
+        {
+            var fb = CriarFbException("violação de chave única na constraint UQ_FIN_VENDA_VENDA_ID", 335544665, "23000");
+            Assert.True(UnitOfWork.EhViolacaoDeUniqueVendaId(new DbUpdateException("x", fb)));
+        }
+
+        [Fact]
+        public void EhViolacaoDeUniqueVendaId_OutraConstraint_NaoDetecta()
+        {
+            var fb = CriarFbException("violação de chave única na constraint UQ_OUTRA", 335544665, "23000");
+            Assert.False(UnitOfWork.EhViolacaoDeUniqueVendaId(new DbUpdateException("x", fb)));
+        }
+
+        // Os construtores de FbException/IscException são não-públicos: cria por reflexão uma
+        // IscException com ErrorCode/SQLSTATE preenchidos (é dela que FbException lê esses
+        // valores) — só a mensagem passada varia de idioma, sem o texto inglês do engine.
+        private static FbException CriarFbException(string mensagem, int errorCode, string sqlState)
+        {
+            const BindingFlags f = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+            var iscTipo = typeof(FbException).Assembly.GetType("FirebirdSql.Data.Common.IscException", true);
+            var isc = Activator.CreateInstance(iscTipo, f, null, new object[] { new Exception(mensagem) }, null);
+            iscTipo.GetField("<ErrorCode>k__BackingField", f).SetValue(isc, errorCode);
+            iscTipo.GetField("<SQLSTATE>k__BackingField", f).SetValue(isc, sqlState);
+            iscTipo.GetField("_message", f).SetValue(isc, mensagem);
+
+            var ctor = typeof(FbException).GetConstructor(f, null, new[] { typeof(string), typeof(Exception) }, null);
+            return (FbException)ctor.Invoke(new object[] { mensagem, isc });
+        }
+
         /// <summary>
         /// Cria um <see cref="VendaHistorico"/> real (não subclasse — evitaria o
         /// mapeamento EF6, sem TPH configurado) com <c>Operacao</c> fora do domínio válido

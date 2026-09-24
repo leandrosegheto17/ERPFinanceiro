@@ -207,6 +207,59 @@ namespace ERPFinanceiro.Tests.Desktop
         }
 
         [Fact]
+        public async Task PostCancelamento_PipelineHttpCompleto_CobreOsCenariosDoContratoV11()
+        {
+            SemearVenda("V-T32-PEND", quitar: false);
+            SemearVenda("V-T32-QUIT", quitar: true);
+
+            using (Autofac.IContainer container = CompositionRoot.Construir())
+            using (var host = new ApiHost(container))
+            {
+                int porta = ObterPortaLivre();
+                ERPFinanceiro.Api.Startup.ChaveApi = "chave-teste-t35";
+                host.Start(porta);
+
+                string url = $"http://localhost:{porta}/api/vendas/cancelamento";
+
+                using (var client = new HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add("X-Api-Key", "chave-teste-t35");
+
+                    // Pendente -> 200 Cancelada
+                    var r1 = await client.PostAsync(url, JsonContent(@"{""vendaId"":""V-T32-PEND""}"));
+                    Assert.Equal(HttpStatusCode.OK, r1.StatusCode);
+                    Assert.Equal("Cancelada", (string)JObject.Parse(await r1.Content.ReadAsStringAsync())["status"]);
+
+                    // Repeticao -> 200 idempotente
+                    var r2 = await client.PostAsync(url, JsonContent(@"{""vendaId"":""V-T32-PEND""}"));
+                    Assert.Equal(HttpStatusCode.OK, r2.StatusCode);
+                    Assert.Equal("Cancelada", (string)JObject.Parse(await r2.Content.ReadAsStringAsync())["status"]);
+
+                    // Desconhecida -> 200 (cria Cancelada)
+                    var r3 = await client.PostAsync(url, JsonContent(@"{""vendaId"":""V-T32-DESC"",""motivo"":""x""}"));
+                    Assert.Equal(HttpStatusCode.OK, r3.StatusCode);
+                    Assert.Equal("Cancelada", (string)JObject.Parse(await r3.Content.ReadAsStringAsync())["status"]);
+
+                    // Quitada sem motivo -> 409 MOTIVO_OBRIGATORIO
+                    var r4 = await client.PostAsync(url, JsonContent(@"{""vendaId"":""V-T32-QUIT""}"));
+                    Assert.Equal(HttpStatusCode.Conflict, r4.StatusCode);
+                    Assert.Equal("MOTIVO_OBRIGATORIO", (string)JObject.Parse(await r4.Content.ReadAsStringAsync())["erro"]["codigo"]);
+
+                    // Quitada com motivo -> 200
+                    var r5 = await client.PostAsync(url, JsonContent(@"{""vendaId"":""V-T32-QUIT"",""motivo"":""Estorno""}"));
+                    Assert.Equal(HttpStatusCode.OK, r5.StatusCode);
+
+                    // Payload invalido -> 400 PAYLOAD_INVALIDO
+                    var r6 = await client.PostAsync(url, JsonContent(@"{""motivo"":""x""}"));
+                    Assert.Equal(HttpStatusCode.BadRequest, r6.StatusCode);
+                    Assert.Equal("PAYLOAD_INVALIDO", (string)JObject.Parse(await r6.Content.ReadAsStringAsync())["erro"]["codigo"]);
+                }
+
+                host.Stop();
+            }
+        }
+
+        [Fact]
         public async Task GetStatus_PipelineHttpCompletoComContainerRealEFirebirdReal_RetornaStatusPascalCaseE404()
         {
             const string vendaIdCancelada = "V-T31-HTTP-CANC";
@@ -250,6 +303,24 @@ namespace ERPFinanceiro.Tests.Desktop
                 }
 
                 host.Stop();
+            }
+        }
+
+        private void SemearVenda(string vendaId, bool quitar)
+        {
+            using (var conn = AbrirConexao())
+            using (var ctx = new FinanceiroDbContext(conn))
+            {
+                var venda = Venda.CriarPendente(
+                    vendaId, "C-T32", 10m,
+                    new[] { new VendaItem("P-T32", 1, 10m) },
+                    DateTime.UtcNow.AddHours(-2));
+                if (quitar)
+                {
+                    venda.Quitar(DateTime.UtcNow.AddHours(-1));
+                }
+                new VendaRepository(ctx).Adicionar(venda);
+                new UnitOfWork(ctx).SalvarAlteracoes();
             }
         }
     }

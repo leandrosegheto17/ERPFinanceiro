@@ -3,6 +3,7 @@ using System.Linq;
 using System.Web.Http;
 using ERPFinanceiro.Api.Dtos;
 using ERPFinanceiro.Application.Commands;
+using ERPFinanceiro.Application.Consultas;
 using ERPFinanceiro.Application.Exceptions;
 using ERPFinanceiro.Application.Validacao;
 using ERPFinanceiro.Application.Servicos;
@@ -32,10 +33,31 @@ namespace ERPFinanceiro.Api.Controllers
 
         private readonly CancelamentoService _cancelamentoService;
 
-        public VendasController(QuitacaoService quitacaoService, CancelamentoService cancelamentoService)
+        private readonly ConsultaService _consultaService;
+
+        public VendasController(QuitacaoService quitacaoService, CancelamentoService cancelamentoService, ConsultaService consultaService)
         {
             _cancelamentoService = cancelamentoService ?? throw new ArgumentNullException(nameof(cancelamentoService));
             _quitacaoService = quitacaoService ?? throw new ArgumentNullException(nameof(quitacaoService));
+            _consultaService = consultaService ?? throw new ArgumentNullException(nameof(consultaService));
+        }
+
+        /// <summary>
+        /// <c>GET /api/vendas/{vendaId}/status</c> (contrato-v1.1.md Seção 3.3, T-31). 200 com
+        /// <c>{vendaId,status}</c> (status string PascalCase, P-3); venda inexistente ->
+        /// <c>VendaNaoEncontradaException</c> (404 <c>VENDA_NAO_ENCONTRADA</c>, via GlobalExceptionHandler).
+        /// </summary>
+        [HttpGet]
+        [Route("{vendaId}/status")]
+        public IHttpActionResult ObterStatus(string vendaId)
+        {
+            VendaStatusDto dto = _consultaService.ObterStatus(vendaId);
+
+            return Ok(new VendaStatusResponseDto
+            {
+                VendaId = dto.VendaId,
+                Status = dto.Status.ToString()
+            });
         }
 
         /// <summary>

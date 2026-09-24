@@ -259,6 +259,53 @@ namespace ERPFinanceiro.Tests.Desktop
             }
         }
 
+        [Fact]
+        public async Task GetStatus_PipelineHttpCompletoComContainerRealEFirebirdReal_RetornaStatusPascalCaseE404()
+        {
+            const string vendaIdCancelada = "V-T31-HTTP-CANC";
+            SemearVendaCancelada(vendaIdCancelada);
+
+            using (Autofac.IContainer container = CompositionRoot.Construir())
+            using (var host = new ApiHost(container))
+            {
+                int porta = ObterPortaLivre();
+                ERPFinanceiro.Api.Startup.ChaveApi = "chave-teste-t35";
+                host.Start(porta);
+                Assert.Equal(EstadoApiHost.Ativa, host.Estado);
+
+                string baseUrl = $"http://localhost:{porta}/api/vendas";
+
+                using (var client = new HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add("X-Api-Key", "chave-teste-t35");
+
+                    HttpResponseMessage r1 = await client.GetAsync($"{baseUrl}/{vendaIdCancelada}/status");
+                    Assert.Equal(HttpStatusCode.OK, r1.StatusCode);
+                    JObject c1 = JObject.Parse(await r1.Content.ReadAsStringAsync());
+                    Assert.Equal(vendaIdCancelada, (string)c1["vendaId"]);
+                    Assert.Equal(JTokenType.String, c1["status"].Type);
+                    Assert.Equal("Cancelada", (string)c1["status"]);
+
+                    string corpoQuitacao = @"{ ""vendaId"": ""V-T31-HTTP-Q"", ""clienteId"": ""C-T31"", ""valorTotal"": 10.00,
+                        ""itens"": [ { ""produtoId"": ""P-X"", ""quantidade"": 1, ""precoUnitario"": 10.00 } ] }";
+                    HttpResponseMessage rq = await client.PostAsync($"{baseUrl}/quitacao", JsonContent(corpoQuitacao));
+                    Assert.Equal(HttpStatusCode.OK, rq.StatusCode);
+
+                    HttpResponseMessage r2 = await client.GetAsync($"{baseUrl}/V-T31-HTTP-Q/status");
+                    Assert.Equal(HttpStatusCode.OK, r2.StatusCode);
+                    JObject c2 = JObject.Parse(await r2.Content.ReadAsStringAsync());
+                    Assert.Equal("Quitada", (string)c2["status"]);
+
+                    HttpResponseMessage r3 = await client.GetAsync($"{baseUrl}/V-T31-INEXISTENTE/status");
+                    Assert.Equal(HttpStatusCode.NotFound, r3.StatusCode);
+                    JObject c3 = JObject.Parse(await r3.Content.ReadAsStringAsync());
+                    Assert.Equal("VENDA_NAO_ENCONTRADA", (string)c3["erro"]["codigo"]);
+                }
+
+                host.Stop();
+            }
+        }
+
         private void SemearVenda(string vendaId, bool quitar)
         {
             using (var conn = AbrirConexao())

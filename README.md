@@ -35,7 +35,7 @@ Módulo Financeiro do desafio ERP: um aplicativo Windows (Desktop, .NET Framewor
 | Executável Desktop | **PENDENTE**: `Program.Main` ainda lança `NotImplementedException` ("Esqueleto T-04"); tela, splash e início do host chegam em T-26/T-42/T-46 |
 | Relatório de listagem (FastReport, PDF): `RelatorioDataSource` e `RelatorioListagem` | Implementado (T-48/T-49) |
 | Tela (DevExpress) e preview do relatório | **PENDENTE** (T-50) |
-| Pacote de entrega (pasta com executável, DLLs Firebird, `.sql`, `.fdb` de demonstração) | **PENDENTE** (T-53) |
+| Pacote de entrega (pasta com executável, DLLs Firebird, `.sql`, `.fdb` de demonstração) | **Não aplicável**: a entrega é só o código-fonte. O script opcional `tools/T-53-empacotar/Empacotar.ps1` monta a pasta, se necessário. |
 | Evidências (prints e PDF) em `docs/evidencias/` | **PENDENTE** (T-55) |
 | Teste em máquina limpa seguindo este README | **PENDENTE** (T-56) |
 
@@ -49,7 +49,7 @@ Verificados nos arquivos `.csproj` e nos ADRs 002 e 009:
 - .NET Framework 4.8 (Runtime e Developer Pack). Todos os projetos usam `net48` com `LangVersion 7.3`.
 - Para compilar: Visual Studio 2022 (ou Build Tools) com workload de desktop .NET, ou o SDK `dotnet` capaz de compilar projetos SDK-style `net48`. Os projetos usam `PackageReference`; o pacote de referência `net48` é resolvido via NuGet.
 - Acesso ao NuGet oficial (nuget.org) para restaurar pacotes (regra 17 do TASK.md: só pacotes oficiais).
-- Firebird 3.0.x **Win64 embarcado**: as DLLs nativas **não** vêm nos pacotes NuGet (o `FirebirdSql.Data.FirebirdClient` 10.x é só código gerenciado). Baixe o zip "sem instalar" `Firebird-3.0.12.33787-0-x64.zip` em <https://sourceforge.net/projects/firebird/files/v3.0.12/> e copie para a pasta do executável: `fbclient.dll` (e uma cópia chamada `fbembed.dll`), `ib_util.dll`, `icudt52.dll`, `icudt52l.dat`, `icuin52.dll`, `icuuc52.dll`, `msvcp100.dll`, `msvcr100.dll`, `zlib1.dll`, `firebird.conf`, `firebird.msg`, `security3.fdb`, `plugins.conf`, a pasta `plugins/` (`engine12.dll`, `legacy_auth.dll`, `legacy_usermanager.dll`, `srp.dll`) e a pasta `intl/` (`fbintl.dll`, `fbintl.conf`). A lista vem do ADR-009. O pacote de entrega (T-53) deverá trazer esse conjunto já pronto (**PENDENTE**).
+- Firebird 3.0.x **Win64 embarcado**: as DLLs nativas **não** vêm nos pacotes NuGet (o `FirebirdSql.Data.FirebirdClient` 10.x é só código gerenciado). Baixe o zip "sem instalar" `Firebird-3.0.12.33787-0-x64.zip` em <https://sourceforge.net/projects/firebird/files/v3.0.12/> e copie para a pasta do executável: `fbclient.dll` (e uma cópia chamada `fbembed.dll`), `ib_util.dll`, `icudt52.dll`, `icudt52l.dat`, `icuin52.dll`, `icuuc52.dll`, `msvcp100.dll`, `msvcr100.dll`, `zlib1.dll`, `firebird.conf`, `firebird.msg`, `security3.fdb`, `plugins.conf`, a pasta `plugins/` (`engine12.dll`, `legacy_auth.dll`, `legacy_usermanager.dll`, `srp.dll`) e a pasta `intl/` (`fbintl.dll`, `fbintl.conf`). A lista vem do ADR-009. O script opcional `tools/T-53-empacotar/Empacotar.ps1` baixa e monta esse conjunto; para rodar a partir do código-fonte, copie-o manualmente para a pasta de saída do Desktop.
 - Para relatório e tela (quando entregues): trials descritos na seção 3.
 - Ferramenta opcional: `isql` do Firebird, para aplicar os scripts SQL manualmente (o `DbInitializer` também os aplica em execução).
 
@@ -136,18 +136,18 @@ isql -user SYSDBA -password <senha> "C:\ERPFinanceiro\data\financeiro.fdb" -i da
 
 Os scripts declaram em cabeçalho que também são aplicados em execução pelo `DbInitializer` (T-12) quando o `.fdb` não existe. Os cabeçalhos citam `isql -i <arquivo>` como forma de uso; a linha de comando acima com usuário/senha/banco é a sintaxe padrão do `isql` e não foi executada pela T-54. Evidências de execução dos scripts: `database/evidencia-execucao-T-05.txt` e `-T-06.txt`.
 
-Um `.fdb` de demonstração pronto será entregue no pacote (T-53, **PENDENTE**). Nenhum `.fdb` é versionado no repositório (`.gitignore`).
+A entrega é só o código-fonte: gere o `.fdb` aplicando `database/*.sql` (ou deixe o `DbInitializer` criá-lo na primeira execução). Nenhum `.fdb` é versionado no repositório (`.gitignore`).
 
 ## 7. Execução
 
 **PENDENTE.** Enquanto T-26/T-42/T-46/T-53 não forem concluídas o executável não sobe (`Program.Main` lança `NotImplementedException`). Quando entregue, o roteiro previsto é:
 
-1. Copiar a pasta de entrega (T-53) para um diretório qualquer (ex.: `C:\ERPFinanceiro`).
+1. Compilar a solução (`ERPFinanceiro.sln`, x64) e usar a pasta de saída do Desktop (ou a pasta gerada por `tools/T-53-empacotar/Empacotar.ps1`).
 2. Copiar `App.config.example` para `App.config` e preencher chave, senha e caminhos (seção 5).
 3. Executar `ERPFinanceiro.Desktop.exe`. Ele abre o banco, aplica o schema se necessário e inicia a API em `http://localhost:{Api:Porta}/`.
 4. Verificar com `curl http://localhost:5000/api/health` (endpoint implementado, sem `X-Api-Key`; o executável ainda não sobe).
 
-Atualize esta seção com os passos reais na T-53/T-56.
+Atualize esta seção com os passos reais na T-56 (máquina limpa: clonar, compilar, seguir este README).
 
 ## 8. Integração com o Vendas (API)
 

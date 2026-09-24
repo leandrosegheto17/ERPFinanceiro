@@ -347,3 +347,10 @@
 - **Decisão do usuário (23/09/2026):** ignorar o Lote 12 e considerá-lo concluído. T-52 marcada
   `Concluída` como dispensada; a verificação com Narrador não foi feita e segue como risco aceito.
 - Status: Resolvido (risco aceito pelo usuário) — verificação manual de acessibilidade não realizada.
+
+## Bloqueio 006 — 24/09/2026
+- Reportado por: executor (T-53, `/executar_tarefa`)
+- O quê: o `.fdb` de demonstração não pôde ser gerado: um `testhost.net48.exe` órfão (PID 31468) mantinha um Firebird embarcado mapeado e o isql embarcado falhava/travava. Pendência adicional (RL9-04): DevExpress em evaluation, redistribuição proibida.
+- Escala para: usuário.
+- **Decisão do usuário (24/09/2026):** a entrega é só o código-fonte (processo seletivo). T-53 redefinida para manter apenas o script de empacotamento; `.fdb` e pasta de entrega não são mais exigidos e a licença DevExpress deixa de ser impeditiva. T-56 passa a testar clone + compilação + README.
+- Status: Resolvido (redesenho de escopo)

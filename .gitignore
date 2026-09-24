@@ -27,3 +27,6 @@ TestResults/
 .idea/
 *.DotSettings.user
 Thumbs.db
+
+# T-53: pasta de entrega gerada por tools/T-53-empacotar
+dist/

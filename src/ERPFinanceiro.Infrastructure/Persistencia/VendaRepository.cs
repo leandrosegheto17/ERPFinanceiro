@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Data.Entity;
 using System.Linq;
+using ERPFinanceiro.Application.Consultas;
 using ERPFinanceiro.Application.Interfaces;
 using ERPFinanceiro.Domain.Entities;
 
@@ -92,6 +93,25 @@ namespace ERPFinanceiro.Infrastructure.Persistencia
                 .AsNoTracking()
                 .OrderByDescending(v => v.DataRecebimento)
                 .Take(quantidadeMaxima)
+                .ToList();
+        }
+
+        public IReadOnlyList<Venda> ListarMaisRecentes(ERPFinanceiro.Application.Consultas.FiltroVendas filtro, int quantidadeMaxima)
+        {
+            return _contexto.Vendas
+                .AsNoTracking()
+                .Aplicar(filtro)
+                .OrderByDescending(v => v.DataRecebimento)
+                .Take(quantidadeMaxima)
+                .ToList();
+        }
+
+        public IReadOnlyList<Venda> ListarTodas(ERPFinanceiro.Application.Consultas.FiltroVendas filtro)
+        {
+            return _contexto.Vendas
+                .AsNoTracking()
+                .Aplicar(filtro)
+                .OrderByDescending(v => v.DataRecebimento)
                 .ToList();
         }
 

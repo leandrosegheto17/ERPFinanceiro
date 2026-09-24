@@ -43,7 +43,7 @@ namespace ERPFinanceiro.Desktop
             _botao.Click += async (s, e) => await EmitirAsync();
             var painel = new PanelControl { Dock = DockStyle.Top, Height = 40, BorderStyle = DevExpress.XtraEditors.Controls.BorderStyles.NoBorder };
             painel.TabStop = false;
-            painel.TabIndex = 1; // T-51: após a grid (TabIndex 0 no host de FrmConsulta)
+            painel.TabIndex = 2; // T-51: após a grid (TabIndex 1 no host de FrmConsulta; filtros = 0, T-58)
             painel.Controls.Add(_botao);
             _janela.Controls.Add(painel);
         }

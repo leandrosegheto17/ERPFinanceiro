@@ -18,7 +18,8 @@ namespace ERPFinanceiro.Desktop
         public ComposicaoJanelaPrincipal(FrmConsulta janela, IContainer container, ApiHost host, int porta,
             string caminhoFdb, ITemporizador temporizador, IAreaTransferencia areaTransferencia,
             Func<bool> confirmar, Action liberarInstancia = null, Action<Exception> aoFalhar = null,
-            FluxoEmitirRelatorio fluxoRelatorio = null, Func<Application.Consultas.FiltroVendas> filtroCorrente = null)
+            FluxoEmitirRelatorio fluxoRelatorio = null, Func<Application.Consultas.FiltroVendas> filtroCorrente = null,
+            FiltrosConsultaModelo filtros = null)
         {
             if (janela == null) throw new ArgumentNullException(nameof(janela));
             if (container == null) throw new ArgumentNullException(nameof(container));
@@ -28,6 +29,13 @@ namespace ERPFinanceiro.Desktop
             Barra = new BarraStatusPresenter(new FonteEstadoApiHost(host), container.Resolve<IHealthService>(),
                 porta, caminhoFdb, areaTransferencia, temporizador);
             janela.AnexarBarraStatus(Barra); // inicia atualização (abertura + 15 s)
+
+            if (filtros != null)
+            {
+                // T-58 (F-2): painel de filtros; o relatório usa o mesmo filtro corrente (T-48).
+                Filtros = new PainelFiltrosVisual(janela, filtros, texto => janela.BarraStatus?.MostrarMensagem(texto));
+                if (filtroCorrente == null) filtroCorrente = () => filtros.Corrente;
+            }
 
             if (fluxoRelatorio != null)
             {
@@ -48,6 +56,7 @@ namespace ERPFinanceiro.Desktop
         }
 
         public EmissaoRelatorioVisual Relatorio { get; }
+        public PainelFiltrosVisual Filtros { get; }
         public BarraStatusPresenter Barra { get; }
         public EncerramentoAplicacao Encerramento { get; }
 

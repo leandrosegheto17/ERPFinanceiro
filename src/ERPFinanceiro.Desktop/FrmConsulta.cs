@@ -39,6 +39,9 @@ namespace ERPFinanceiro.Desktop
         private readonly PanelControl _painelErro;
         private readonly LabelControl _lblErro;
         private readonly SimpleButton _btnTentar;
+        private readonly PanelControl _host;
+        private readonly PanelControl _rodape;
+        private Func<string> _textoVazio;
 
         private void CentralizarSobreposicoes()
         {
@@ -73,7 +76,7 @@ namespace ERPFinanceiro.Desktop
             _lblLegenda = CriarRotulo(DockStyle.Left, HorzAlignment.Near, "* Cancelada sem quitação registrada: sem cliente/valor (\"—\").");
             _lblLegenda.Width = 700;
             _lblLegenda.AccessibleName = "Legenda da lista";
-            var rodape = new PanelControl { Dock = DockStyle.Bottom, Height = 28, BorderStyle = BorderStyles.NoBorder };
+            var rodape = _rodape = new PanelControl { Dock = DockStyle.Bottom, Height = 28, BorderStyle = BorderStyles.NoBorder };
             _lblAviso = CriarRotulo(DockStyle.Fill, HorzAlignment.Center, string.Empty);
             _lblAviso.AccessibleName = "Aviso de limite de linhas";
             rodape.Controls.Add(_lblAviso);
@@ -98,7 +101,7 @@ namespace ERPFinanceiro.Desktop
             _painelErro.Controls.Add(_lblErro);
             _painelErro.Controls.Add(_btnTentar);
             // Sobreposições ficam num host irmão da grid: Enabled=false da grid (esmaecida) não desabilita o botão.
-            var host = new PanelControl { Dock = DockStyle.Fill, BorderStyle = BorderStyles.NoBorder };
+            var host = _host = new PanelControl { Dock = DockStyle.Fill, BorderStyle = BorderStyles.NoBorder };
             host.Controls.Add(_progresso);
             host.Controls.Add(_painelErro);
             host.Controls.Add(_grid);
@@ -117,9 +120,9 @@ namespace ERPFinanceiro.Desktop
             _painelErro.AccessibleName = "Erro ao consultar";
             _btnTentar.AccessibleDescription = "Consulta novamente o banco de dados.";
             _btnTentar.TabIndex = 0;
-            host.TabIndex = 0;
+            host.TabIndex = 1; // T-58: painel de filtros (quando anexado) usa TabIndex 0, antes da grid
             host.TabStop = false;
-            rodape.TabIndex = 2;
+            rodape.TabIndex = 3;
             rodape.TabStop = false;
             ActiveControl = _grid; // foco inicial na grid (UX-SPEC 5, [A])
 
@@ -169,6 +172,20 @@ namespace ERPFinanceiro.Desktop
             _barraStatus = new BarraStatusVisual(this, presenter);
             presenter.Iniciar();
             FormClosed += (s, e) => _barraStatus.Dispose();
+        }
+
+        /// <summary>
+        /// T-58: anexa o painel de filtros (F-2) acima da grid. <paramref name="textoVazio"/> escolhe o texto do estado
+        /// vazio (com filtro ativo: "Nenhuma venda para os filtros informados."). TabIndex 0 = antes da grid.
+        /// </summary>
+        internal void AnexarPainelFiltros(Control painel, Func<string> textoVazio)
+        {
+            painel.TabIndex = 0;
+            _host.TabIndex = 1;
+            _rodape.TabIndex = 3;
+            _textoVazio = textoVazio;
+            Controls.Add(painel);
+            painel.SendToBack(); // docking processa de trás p/ frente: filtros ficam no topo, acima do painel do relatório
         }
 
         /// <summary>T-44: abre F-3 (modal) para a linha focada; ao fechar, o foco volta à linha de origem.</summary>
@@ -302,7 +319,7 @@ namespace ERPFinanceiro.Desktop
         }
         internal string TextoErro => _lblErro.Text;
         internal string TextoAviso => _lblAviso.Text;
-        internal string TextoCentralVazio => _estado == EstadoConsulta.Vazio ? TextosConsulta.Vazio : null;
+        internal string TextoCentralVazio => _estado == EstadoConsulta.Vazio ? (_textoVazio?.Invoke() ?? TextosConsulta.Vazio) : null;
         internal bool BotaoTentarNovamenteHabilitado => _btnTentar.Enabled;
         // PerformClick não dispara sem o form exibido (CanSelect); invoca o mesmo handler do Click.
         internal void ClicarTentarNovamente() => Recarregar();
@@ -343,7 +360,7 @@ namespace ERPFinanceiro.Desktop
             using (var formato = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
             {
                 var area = new RectangleF(e.Bounds.X, e.Bounds.Y, e.Bounds.Width, e.Bounds.Height);
-                e.Graphics.DrawString(TextosConsulta.Vazio, fonte, SystemBrushes.GrayText, area, formato);
+                e.Graphics.DrawString(_textoVazio?.Invoke() ?? TextosConsulta.Vazio, fonte, SystemBrushes.GrayText, area, formato);
             }
             e.Handled = true;
         }

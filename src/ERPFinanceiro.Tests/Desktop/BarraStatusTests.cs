@@ -132,6 +132,30 @@ namespace ERPFinanceiro.Tests.Desktop
             Assert.Contains("boom", p.UltimoErro);
         }
 
+        [Theory]
+        [InlineData("Erro ao abrir DataSource=x;Password=masterkey;Database=a.fdb", "masterkey")]
+        [InlineData("falha User=SYSDBA; PWD=segredo123 timeout", "segredo123")]
+        public async Task Ultimo_erro_e_texto_copiado_mascaram_credenciais(string msg, string segredo)
+        {
+            var area = new AreaFake();
+            var api = new FonteFake { UltimoErro = new InvalidOperationException(msg) };
+            var health = new HealthFake { Resultado = ResultadoHealth.ComFalha(msg) };
+            var p = new BarraStatusPresenter(api, health, 5000, "x", area, new TimerFake());
+            await p.AtualizarAsync();
+            p.CopiarDetalhes();
+            Assert.DoesNotContain(segredo, area.Texto);
+            Assert.DoesNotContain("SYSDBA", area.Texto);
+            Assert.Contains("***", area.Texto);
+        }
+
+        [Fact]
+        public async Task Ultimo_erro_limita_tamanho()
+        {
+            var api = new FonteFake { UltimoErro = new InvalidOperationException(new string('a', 5000)) };
+            var p = new BarraStatusPresenter(api, new HealthFake(), 5000, "x", new AreaFake(), new TimerFake());
+            Assert.True(p.UltimoErro.Length < 600);
+        }
+
         private sealed class ThrowingHealth : IHealthService
         {
             public ResultadoHealth ObterStatus() { throw new InvalidOperationException("boom"); }

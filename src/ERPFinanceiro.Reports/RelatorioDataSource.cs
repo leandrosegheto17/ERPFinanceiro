@@ -52,8 +52,12 @@ namespace ERPFinanceiro.Reports
         /// </summary>
         public TotaisRelatorioVendas ObterTotais(FiltroVendas filtro, bool incluirPendente = true)
         {
-            ResultadoRelatorioVendas resultado = Obter(filtro);
+            return CalcularTotais(Obter(filtro), incluirPendente);
+        }
 
+        /// <summary>Mesmo cálculo de <see cref="ObterTotais"/> sobre um resultado já obtido (sem nova consulta).</summary>
+        public static TotaisRelatorioVendas CalcularTotais(ResultadoRelatorioVendas resultado, bool incluirPendente = true)
+        {
             TotalPorStatus Somar(StatusVenda status)
             {
                 decimal total = 0m;

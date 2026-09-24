@@ -128,7 +128,9 @@ namespace ERPFinanceiro.Desktop
                         return new ERPFinanceiro.Reports.RelatorioDataSource(escopo.Resolve<ERPFinanceiro.Application.Consultas.ConsultaService>()).Obter(filtro);
                     }
                 },
-                gerarPdf: (dados, filtro, em, caminho) => gerador.Gerar(dados, filtro, em, caminho),
+                // D-03 (pendente) ainda nao decidida e T-62 pendente: linha pendente omitida (incluirPendente: false).
+                gerarPdf: (dados, filtro, em, caminho) => gerador.Gerar(dados, filtro, em, caminho,
+                    ERPFinanceiro.Reports.RelatorioDataSource.CalcularTotais(dados, incluirPendente: false)),
                 pastaTemporaria: FluxoEmitirRelatorio.PastaTemporariaPadrao,
                 abridor: new AbridorArquivoSistema(),
                 preview: new ApresentadorPreviewIndisponivel(),

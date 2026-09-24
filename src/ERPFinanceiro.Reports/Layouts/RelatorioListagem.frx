@@ -22,6 +22,9 @@
     <Parameter Name="Filtro" DataType="System.String"/>
     <Parameter Name="EmitidoEm" DataType="System.String"/>
     <Parameter Name="TotalListado" DataType="System.String"/>
+    <Parameter Name="TotalQuitado" DataType="System.String"/>
+    <Parameter Name="TotalCancelado" DataType="System.String"/>
+    <Parameter Name="TotalPendente" DataType="System.String"/>
     <Parameter Name="NotaNulos" DataType="System.String"/>
     <Parameter Name="MensagemVazia" DataType="System.String"/>
   </Dictionary>
@@ -49,12 +52,15 @@
       <TextObject Name="TxtQuitada" Left="458" Width="130" Height="18" Text="[Linhas.Quitada]" Style="Linha"/>
       <TextObject Name="TxtCancelada" Left="588" Width="130.2" Height="18" Text="[Linhas.Cancelada]" Style="Linha"/>
     </DataBand>
-    <ReportSummaryBand Name="ReportSummary1" Top="116" Width="718.2" Height="80">
+    <ReportSummaryBand Name="ReportSummary1" Top="116" Width="718.2" Height="140">
       <TextObject Name="TxtVazio" Width="718.2" Height="20" Text="[MensagemVazia]" Style="Texto"/>
-      <TextObject Name="TxtTotal" Top="24" Width="718.2" Height="22" Text="Total listado:   R$ [TotalListado]  (soma dos valores listados)" Style="Total"/>
-      <TextObject Name="TxtNotaNulos" Top="50" Width="718.2" Height="28" Text="[NotaNulos]" Style="Texto"/>
+      <TextObject Name="TxtTotalQuitado" Top="24" Width="718.2" Height="18" CanShrink="true" Text="[TotalQuitado]" Style="Texto"/>
+      <TextObject Name="TxtTotalCancelado" Top="42" Width="718.2" Height="18" CanShrink="true" Text="[TotalCancelado]" Style="Texto"/>
+      <TextObject Name="TxtTotalPendente" Top="60" Width="718.2" Height="18" CanShrink="true" Text="[TotalPendente]" Style="Texto"/>
+      <TextObject Name="TxtTotal" Top="82" Width="718.2" Height="22" Text="Total listado:   R$ [TotalListado]  (soma dos valores listados)" Style="Total"/>
+      <TextObject Name="TxtNotaNulos" Top="108" Width="718.2" Height="28" Text="[NotaNulos]" Style="Texto"/>
     </ReportSummaryBand>
-    <PageFooterBand Name="PageFooter1" Top="200" Width="718.2" Height="20">
+    <PageFooterBand Name="PageFooter1" Top="260" Width="718.2" Height="20">
       <TextObject Name="TxtPagina" Width="718.2" Height="20" Text="Página [Page] de [TotalPages]" HorzAlign="Right" Style="Texto"/>
     </PageFooterBand>
   </ReportPage>

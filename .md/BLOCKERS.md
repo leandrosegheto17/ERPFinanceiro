@@ -344,4 +344,6 @@
   registra o resultado (o executor pode gerar antes o esqueleto de `docs/acessibilidade.md` para
   preenchimento manual); (b) aceitar T-52 como pendência manual explícita e seguir para
   `/validar` do Lote 12; (c) redefinir T-52 com o Coordenador.
-- Status: Aberto
+- **Decisão do usuário (23/09/2026):** ignorar o Lote 12 e considerá-lo concluído. T-52 marcada
+  `Concluída` como dispensada; a verificação com Narrador não foi feita e segue como risco aceito.
+- Status: Resolvido (risco aceito pelo usuário) — verificação manual de acessibilidade não realizada.

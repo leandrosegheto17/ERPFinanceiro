@@ -94,5 +94,22 @@ namespace ERPFinanceiro.Infrastructure.Persistencia
                 .Take(quantidadeMaxima)
                 .ToList();
         }
+
+        /// <inheritdoc cref="IVendaConsultaLeitura.ListarTodas" />
+        /// <summary>
+        /// Consulta de relatório (T-48): sem tracking, mesma ordenação de
+        /// <see cref="ListarMaisRecentes"/>, mas **sem Take** — o relatório precisa da
+        /// massa completa para o "Total listado" bater com a soma real (TASK.md Seção 1
+        /// regra 15). Não inclui Itens/Historico pelo mesmo motivo de
+        /// <see cref="ListarMaisRecentes"/> (listagem/relatório usam só o cabeçalho da
+        /// venda).
+        /// </summary>
+        public IReadOnlyList<Venda> ListarTodas()
+        {
+            return _contexto.Vendas
+                .AsNoTracking()
+                .OrderByDescending(v => v.DataRecebimento)
+                .ToList();
+        }
     }
 }

@@ -1,0 +1,91 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Harness descartável de T-38 (ADR-010): mesma disciplina de tools/T-34-smoke-harness (T-34) e
+    spikes/T-01-firebird-spike — sobe a API real (ApiHost + Startup + CompositionRoot.Construir(),
+    T-26/T-27) contra um Firebird embarcado real e novo, e dispara via HttpClient (não curl externo)
+    os cenários de "suíte de integração simulada" de T-38: quitação (venda nova), repetição
+    idempotente (P-2, sem novo histórico) e GET status refletindo o resultado. Consulta o banco
+    diretamente (VendaRepository/FinanceiroDbContext, mesmo padrão do resto do Program.cs) só para
+    confirmar a contagem de VendaHistorico antes/depois da repetição — o HTTP em si não expõe
+    histórico, então essa é a única forma de verificar objetivamente "sem novo histórico".
+
+    IMPORTANTE (ADR-010, .md/BLOCKERS.md Bloqueio 002): isto é uma SIMULAÇÃO — um harness HTTP
+    fazendo o papel do "Vendas" contra esta API local. NÃO é integração real com o sistema Vendas
+    em Delphi (que segue como pendência externa, fora do alcance deste sandbox). Rótulo obrigatório
+    em toda evidência gerada por este harness.
+
+    Não faz parte da ERPFinanceiro.sln (não é código de produção nem teste automatizado) — só
+    ferramenta de apoio para produzir a evidência de execução real de T-38.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>T38IntegracaoSimulada</RootNamespace>
+    <AssemblyName>T38IntegracaoSimulada</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ERPFinanceiro.Domain\ERPFinanceiro.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ERPFinanceiro.Application\ERPFinanceiro.Application.csproj" />
+    <ProjectReference Include="..\..\src\ERPFinanceiro.Infrastructure\ERPFinanceiro.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\ERPFinanceiro.Api\ERPFinanceiro.Api.csproj" />
+    <ProjectReference Include="..\..\src\ERPFinanceiro.Desktop\ERPFinanceiro.Desktop.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Autofac" Version="6.5.0" />
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.4" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- DLLs nativas do Firebird embarcado, mesmo contorno de tools/T-34-smoke-harness. -->
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\fbclient.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\fbembed.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\ib_util.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\icudt52.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\icuin52.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\icuuc52.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\msvcp100.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\msvcr100.dll;
+                    ..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\zlib1.dll"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\fbclient.dll')"
+          Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\*.dat"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48')"
+          Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\*.conf"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48')"
+          Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\firebird.msg"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\firebird.msg')"
+          Link="firebird.msg" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\plugins\*.*"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\plugins')"
+          Link="plugins\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\intl\*.*"
+          Condition="Exists('..\..\spikes\T-01-firebird-spike\FirebirdSpike\bin\Debug\net48\intl')"
+          Link="intl\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+  <!--
+    App.config real é gitignorado (regra global do .gitignore, T-04). Só App.config.example é
+    versionado aqui; copie-o para App.config antes de buildar/rodar.
+  -->
+  <ItemGroup>
+    <None Include="App.config.example">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

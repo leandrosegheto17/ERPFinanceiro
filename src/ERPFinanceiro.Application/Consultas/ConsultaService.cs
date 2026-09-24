@@ -70,6 +70,55 @@ namespace ERPFinanceiro.Application.Consultas
             return new ResultadoListagemVendas(itens, truncado);
         }
 
+        /// <summary>
+        /// Lista vendas para o relatório financeiro (T-48/UX-SPEC 2.3), ordenadas por
+        /// <c>DataRecebimento</c> desc, **sem** o limite de 5.000 (TASK.md Seção 1 regra
+        /// 15 — usa <see cref="IVendaConsultaLeitura.ListarTodas"/>, não
+        /// <see cref="ListarMaisRecentes"/>). "Total listado" e a contagem de vendas com
+        /// valor nulo (nota de rodapé) são calculados **da mesma lista** devolvida
+        /// (<see cref="ResultadoRelatorioVendas"/>), nunca por uma segunda consulta.
+        /// <para>
+        /// Mesma decisão já tomada em <see cref="Listar"/> (T-23): <paramref name="filtro"/>
+        /// é deliberadamente ignorado por ora — a aplicação real de
+        /// <see cref="FiltroVendas"/> é T-57 (Tier B). Até lá, sempre devolve tudo.
+        /// </para>
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Este <see cref="ConsultaService"/> foi construído sem <see cref="IVendaConsultaLeitura"/>
+        /// (parâmetro <c>leitura</c> do construtor).
+        /// </exception>
+        public ResultadoRelatorioVendas ListarParaRelatorio(FiltroVendas filtro)
+        {
+            if (_leitura == null)
+            {
+                throw new InvalidOperationException(
+                    "ConsultaService.ListarParaRelatorio requer IVendaConsultaLeitura (parâmetro 'leitura' do construtor, T-23/T-48).");
+            }
+
+            IReadOnlyList<Venda> vendas = _leitura.ListarTodas();
+
+            List<LinhaRelatorio> linhas = vendas.Select(MapearParaLinhaRelatorio).ToList();
+
+            decimal totalListado = linhas.Sum(l => l.ValorTotal ?? 0m);
+            int quantidadeSemValor = linhas.Count(l => l.ValorTotal == null);
+
+            return new ResultadoRelatorioVendas(linhas, totalListado, quantidadeSemValor);
+        }
+
+        private static LinhaRelatorio MapearParaLinhaRelatorio(Venda venda)
+        {
+            return new LinhaRelatorio
+            {
+                VendaId = venda.VendaId,
+                ClienteId = venda.ClienteId,
+                ValorTotal = venda.ValorTotal,
+                Status = venda.Status,
+                DataRecebimento = venda.DataRecebimento,
+                DataQuitacao = venda.DataQuitacao,
+                DataCancelamento = venda.DataCancelamento
+            };
+        }
+
         private static VendaListagemDto MapearParaListagemDto(Venda venda)
         {
             return new VendaListagemDto

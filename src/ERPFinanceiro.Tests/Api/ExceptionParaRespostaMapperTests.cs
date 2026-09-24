@@ -86,6 +86,25 @@ namespace ERPFinanceiro.Tests.Api
         }
 
         [Fact]
+        public void Mapear_ConcorrenciaException_Retorna409ConflitoConcorrencia()
+        {
+            // RL1-01a: T-16 (ExecutarComRetry) deixa propagar ConcorrenciaException (T-15)
+            // após esgotar as 3 tentativas de retry — o mapper deve traduzir para 409
+            // CONFLITO_CONCORRENCIA, não cair no default (500 ERRO_INTERNO).
+            const string mensagemInterna = "Conflito de concorrência detectado ao salvar VENDA_ID=123.";
+            var excecaoOriginal = new ApplicationExceptions.ConcorrenciaException(mensagemInterna, new InvalidOperationException("0 linhas afetadas"));
+
+            var resultado = ExceptionParaRespostaMapper.Mapear(excecaoOriginal);
+
+            Assert.Equal(HttpStatusCode.Conflict, resultado.StatusHttp);
+            Assert.Equal("CONFLITO_CONCORRENCIA", resultado.Envelope.Erro.Codigo);
+
+            // Mensagem ao cliente é genérica — não vaza a mensagem/detalhe interno (regra 7).
+            Assert.DoesNotContain(mensagemInterna, resultado.Envelope.Erro.Mensagem);
+            Assert.Contains(mensagemInterna, resultado.DetalheLog);
+        }
+
+        [Fact]
         public void Mapear_ExcecaoNaoMapeada_Retorna500ErroInternoSemMensagemOriginalNoEnvelope()
         {
             const string mensagemSensivel = "SENHA_BANCO=supersecreta123; connection string real vazou aqui";

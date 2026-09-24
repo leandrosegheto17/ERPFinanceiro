@@ -32,6 +32,10 @@
     <!-- Caminho do arquivo de log do TraceLogger (T-21); passado pelo composition
          root (T-26) ao construtor de TraceLogger — nunca hardcoded. -->
     <add key="Log:CaminhoArquivo" value="C:\ERPFinanceiro\data\logs\app.log" />
+    <!-- Relatório (F-5, T-50): true/1 força o modo "sem preview" (gera PDF em %TEMP%\ERPFinanceiro\Relatorios
+         e abre no visualizador do sistema). Opcional; ausente = false. No build atual (FastReport Open Source)
+         não há preview real, então o modo sem preview é sempre o efetivo, com ou sem esta chave. -->
+    <add key="Relatorio:PreviewDesativado" value="false" />
   </appSettings>
 
   <connectionStrings>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App.config local do harness descartável de T-38 (não versionado como segredo — sem credencial
+  real, SYSDBA/masterkey são as credenciais padrão do Firebird embarcado usadas em toda a
+  worktree, mesmo padrão de tools/T-34-smoke-harness/App.config.example). Banco dedicado, para
+  não colidir com os .fdb usados pelos testes de integração de T-30/T-31/T-32 nem com o do
+  harness de T-34/T-37.
+-->
+<configuration>
+  <configSections>
+    <section name="entityFramework" type="System.Data.Entity.Internal.ConfigFile.EntityFrameworkSection, EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" requirePermission="false" />
+  </configSections>
+
+  <startup>
+    <supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.8" />
+  </startup>
+
+  <appSettings>
+    <add key="Api:Porta" value="5038" />
+    <add key="Api:ApiKey" value="CHAVE_LOCAL_SIMULADA_T38" />
+    <add key="Banco:CaminhoFdb" value="C:\ERPFinanceiro\data\financeiro_t38_simulado.fdb" />
+    <add key="Banco:Usuario" value="SYSDBA" />
+    <add key="Banco:Senha" value="masterkey" />
+    <add key="Log:CaminhoArquivo" value="C:\ERPFinanceiro\data\logs\app_t38_simulado.log" />
+  </appSettings>
+
+  <connectionStrings>
+    <add name="FinanceiroDbContext"
+         connectionString="User=SYSDBA;Password=masterkey;Database=C:\ERPFinanceiro\data\financeiro_t38_simulado.fdb;DataSource=localhost;Port=3050;Dialect=3;Charset=UTF8;ServerType=1;"
+         providerName="FirebirdSql.Data.FirebirdClient" />
+  </connectionStrings>
+
+  <entityFramework>
+    <defaultConnectionFactory type="EntityFramework.Firebird.FbConnectionFactory, EntityFramework.Firebird" />
+    <providers>
+      <provider invariantName="FirebirdSql.Data.FirebirdClient" type="EntityFramework.Firebird.FbProviderServices, EntityFramework.Firebird" />
+    </providers>
+  </entityFramework>
+
+  <system.data>
+    <DbProviderFactories>
+      <remove invariant="FirebirdSql.Data.FirebirdClient" />
+      <add name="FirebirdClient Data Provider" invariant="FirebirdSql.Data.FirebirdClient"
+           description=".Net Framework Data Provider for Firebird"
+           type="FirebirdSql.Data.FirebirdClient.FirebirdClientFactory, FirebirdSql.Data.FirebirdClient" />
+    </DbProviderFactories>
+  </system.data>
+</configuration>

@@ -70,24 +70,60 @@ namespace ERPFinanceiro.Infrastructure.Persistencia
         }
 
         /// <summary>
+        /// Gds-code estável do Firebird para violação de PRIMARY/UNIQUE KEY
+        /// (<c>isc_unique_key_violation</c> no include C do engine). Confirmado
+        /// empiricamente (RL4-01) via <see cref="FbException.ErrorCode"/> forçando a
+        /// violação real de <c>UQ_FIN_VENDA_VENDA_ID</c> contra Firebird embarcado
+        /// (mesmo harness de <c>UnitOfWorkTests.SalvarAlteracoes_ViolacaoDeUniqueVendaId_LancaConcorrenciaException</c>,
+        /// T-15): <c>ErrorCode=335544665</c>, <c>SQLSTATE=23000</c>. O provider
+        /// gerenciado (FirebirdSql.Data.FirebirdClient 10.3.4) não expõe esse valor como
+        /// constante nomeada em <c>IscCodes</c>, mas o valor numérico é estável — é o
+        /// gds-code isc_* interno do engine, não uma string de mensagem sujeita a locale.
+        /// Nota importante do mesmo experimento: <c>SQLSTATE</c> sozinho **não** é
+        /// específico o bastante — a violação de CHECK constraint
+        /// (<c>CK_FIN_VENDA_HIST_OPER</c>, coberta por
+        /// <c>SalvarAlteracoes_FalhaInjetadaNoHistorico_FazRollbackDaVendaInteira</c>)
+        /// também retorna <c>SQLSTATE=23000</c> (mesma classe "integrity constraint
+        /// violation"), com <c>ErrorCode=335544558</c> diferente. Por isso o sinal
+        /// primário aqui é o <c>ErrorCode</c>, não o <c>SQLSTATE</c>.
+        /// </summary>
+        private const int GdsCodeViolacaoDeChaveUnica = 335544665;
+
+        /// <summary>
         /// Percorre a cadeia de <see cref="Exception.InnerException"/> até achar uma
-        /// <see cref="FbException"/> cuja mensagem indique violação de PRIMARY/UNIQUE KEY
+        /// <see cref="FbException"/> que sinalize violação de PRIMARY/UNIQUE KEY
         /// envolvendo a constraint <c>UQ_FIN_VENDA_VENDA_ID</c> (database/01-schema.sql,
-        /// T-05). Firebird não expõe um código de erro público/estável específico para
-        /// "unique violation" na API gerenciada (<c>FbException.ErrorCode</c> carrega o
-        /// gds-code isc_* interno do provider, sem constante pública equivalente na versão
-        /// 10.3.4 usada aqui — verificado por reflexão contra o assembly do NuGet); a
-        /// mensagem padrão do engine ("violation of PRIMARY or UNIQUE KEY constraint...")
-        /// é o sinal estável documentado pelo próprio Firebird. Checar o nome da constraint
-        /// evita confundir com uma eventual UNIQUE diferente adicionada no futuro a outra
-        /// tabela do mesmo schema.
+        /// T-05). Sinal primário, locale-independente: <see cref="FbException.ErrorCode"/>
+        /// igual a <see cref="GdsCodeViolacaoDeChaveUnica"/> (ver doc do campo acima).
+        /// Fallback (mantido por segurança, RL4-01): se o <c>ErrorCode</c> não bater —
+        /// versão futura do provider que renumere o gds-code, por exemplo — cai para o
+        /// texto em inglês da mensagem padrão do engine, como antes desta tarefa. Em
+        /// ambos os casos, checar o nome da constraint na mensagem evita confundir com
+        /// uma eventual UNIQUE diferente adicionada no futuro a outra tabela do mesmo
+        /// schema (o <c>ErrorCode</c> por si só não identifica qual constraint violou).
         /// </summary>
         private static bool EhViolacaoDeUniqueVendaId(Exception excecao)
         {
             for (var atual = excecao; atual != null; atual = atual.InnerException)
             {
                 var fbExcecao = atual as FbException;
-                if (fbExcecao != null && MensagemIndicaViolacaoDeUnique(fbExcecao.Message))
+                if (fbExcecao == null)
+                {
+                    continue;
+                }
+
+                bool ehConstraintDaVendaId = fbExcecao.Message != null
+                    && fbExcecao.Message.IndexOf("UQ_FIN_VENDA_VENDA_ID", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                if (!ehConstraintDaVendaId)
+                {
+                    continue;
+                }
+
+                bool ehViolacaoDeChave = fbExcecao.ErrorCode == GdsCodeViolacaoDeChaveUnica
+                    || MensagemIndicaViolacaoDeChaveUnica(fbExcecao.Message);
+
+                if (ehViolacaoDeChave)
                 {
                     return true;
                 }
@@ -96,21 +132,23 @@ namespace ERPFinanceiro.Infrastructure.Persistencia
             return false;
         }
 
-        private static bool MensagemIndicaViolacaoDeUnique(string mensagem)
+        /// <summary>
+        /// Fallback (RL4-01) baseado no texto em inglês da mensagem padrão do Firebird,
+        /// usado só quando <see cref="FbException.ErrorCode"/> não bate com
+        /// <see cref="GdsCodeViolacaoDeChaveUnica"/>. Sinal original desta checagem, antes
+        /// de RL4-01 introduzir o <c>ErrorCode</c> como sinal primário.
+        /// </summary>
+        private static bool MensagemIndicaViolacaoDeChaveUnica(string mensagem)
         {
             if (string.IsNullOrEmpty(mensagem))
             {
                 return false;
             }
 
-            bool ehViolacaoDeChave = mensagem.IndexOf("violation of PRIMARY or UNIQUE KEY constraint", StringComparison.OrdinalIgnoreCase) >= 0
+            return mensagem.IndexOf("violation of PRIMARY or UNIQUE KEY constraint", StringComparison.OrdinalIgnoreCase) >= 0
                 || mensagem.IndexOf("violation of FOREIGN KEY constraint", StringComparison.OrdinalIgnoreCase) < 0
                    && mensagem.IndexOf("unique", StringComparison.OrdinalIgnoreCase) >= 0
                    && mensagem.IndexOf("violat", StringComparison.OrdinalIgnoreCase) >= 0;
-
-            bool ehConstraintDaVendaId = mensagem.IndexOf("UQ_FIN_VENDA_VENDA_ID", StringComparison.OrdinalIgnoreCase) >= 0;
-
-            return ehViolacaoDeChave && ehConstraintDaVendaId;
         }
     }
 }

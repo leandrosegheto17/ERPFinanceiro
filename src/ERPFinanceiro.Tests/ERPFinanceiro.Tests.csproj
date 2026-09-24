@@ -22,6 +22,8 @@
     <ProjectReference Include="..\ERPFinanceiro.Api\ERPFinanceiro.Api.csproj" />
     <!-- T-26: exercita ERPFinanceiro.Desktop.CompositionRoot (builder.Build() + resolve). -->
     <ProjectReference Include="..\ERPFinanceiro.Desktop\ERPFinanceiro.Desktop.csproj" />
+    <!-- T-48: exercita ERPFinanceiro.Reports.RelatorioDataSource. -->
+    <ProjectReference Include="..\ERPFinanceiro.Reports\ERPFinanceiro.Reports.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -33,6 +35,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Moq" Version="4.20.72" />
+    <!-- T-49: leitura de texto do PDF gerado (so teste). PdfPig, Apache-2.0. -->
+    <PackageReference Include="PdfPig" Version="0.1.16" />
     <!-- T-12: teste de integração precisa do provider para montar a connection string/consultar RDB$. -->
     <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.4" />
     <!-- T-26: CompositionRootTests resolve diretamente contra o IContainer (builder.Build()). -->

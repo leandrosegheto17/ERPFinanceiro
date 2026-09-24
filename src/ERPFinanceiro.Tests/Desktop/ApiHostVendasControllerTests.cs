@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using ERPFinanceiro.Api;
 using ERPFinanceiro.Application.Interfaces;
 using ERPFinanceiro.Desktop;
 using ERPFinanceiro.Domain.Entities;
@@ -40,6 +41,12 @@ namespace ERPFinanceiro.Tests.Desktop
     /// </summary>
     public class ApiHostVendasControllerTests : IDisposable
     {
+        /// <summary>
+        /// T-35: mesmo valor de <c>Api:ApiKey</c> do <c>App.config</c> local (gitignorado)
+        /// de <c>ERPFinanceiro.Tests</c> — ver <c>App.config.example</c> do Desktop.
+        /// </summary>
+        private const string ChaveApiKeyDeTeste = "CHAVE_LOCAL_TESTE_T32";
+
         private readonly IConfiguracaoBanco _configuracao;
 
         public ApiHostVendasControllerTests()
@@ -136,6 +143,9 @@ namespace ERPFinanceiro.Tests.Desktop
 
                 using (var client = new HttpClient())
                 {
+                    // T-35: X-Api-Key obrigatório (ApiKeyHandler roda antes do roteamento).
+                    client.DefaultRequestHeaders.Add(ApiKeyHandler.HeaderName, ChaveApiKeyDeTeste);
+
                     // Cenário 1: venda inexistente -> 200 {status:"Quitada",dataQuitacao}.
                     string corpoValido = $@"{{
                         ""vendaId"": ""{vendaIdNova}"",

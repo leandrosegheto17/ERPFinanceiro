@@ -23,5 +23,16 @@ namespace ERPFinanceiro.Application.Interfaces
         /// (<c>ConsultaService.Listar</c>, T-23).
         /// </summary>
         IReadOnlyList<Venda> ListarMaisRecentes(int quantidadeMaxima);
+
+        /// <summary>
+        /// Lista **todas** as vendas, ordenadas por <c>DataRecebimento</c> desc, sem
+        /// tracking e **sem limite** (T-48/TASK.md Seção 1 regra 15: "o relatório usa o
+        /// mesmo filtro e sem o limite de 5.000" — ao contrário de
+        /// <see cref="ListarMaisRecentes"/>, usado pela grade F-1/T-23). Não aplica
+        /// nenhum filtro de <c>FiltroVendas</c> (T-57, Tier B, mesma decisão já tomada
+        /// para <see cref="ListarMaisRecentes"/>) — quem chama é
+        /// <c>ConsultaService.ListarParaRelatorio</c> (T-48).
+        /// </summary>
+        IReadOnlyList<Venda> ListarTodas();
     }
 }

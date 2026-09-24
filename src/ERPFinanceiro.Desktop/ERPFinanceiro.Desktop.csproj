@@ -41,10 +41,11 @@
     <!-- T-27: WebApp.Start<Startup>(url) — auto-hospedagem OWIN do ApiHost. Mesma versão
          do Microsoft.Owin.Host.HttpListener já usado por ERPFinanceiro.Api (T-25/ADR-004). -->
     <PackageReference Include="Microsoft.Owin.Hosting" Version="4.2.2" />
-    <!-- DevExpress WinForms (trial) NÃO tem pacote no NuGet público (feed com licença própria,
-         nuget.devexpress.com) e não pôde ser instalado neste ambiente sandbox sem GUI/instalador
-         interativo (mesma limitação de T-02/docs/licencas.md). PackageReference intencionalmente
-         omitida aqui; adicionar quando houver acesso ao feed licenciado (T-41 em diante). -->
+    <!-- T-42: DevExpress WinForms trial disponível no nuget.org público (Bloqueio 003, atualização
+         23/09/2026). Versão 25.1.9 verificada; manter todos os pacotes DevExpress na mesma versão.
+         Warnings DX1000/DX1001 ("For evaluation purposes only") são esperados (docs/licencas.md);
+         nenhuma chave de licença é commitada. -->
+    <PackageReference Include="DevExpress.Win.Grid" Version="25.1.9" />
   </ItemGroup>
 
   <ItemGroup>

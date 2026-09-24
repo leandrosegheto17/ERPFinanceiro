@@ -73,6 +73,123 @@ namespace ERPFinanceiro.Tests.Infrastructure.Persistencia
             return new FbConnection(csb.ConnectionString);
         }
 
+        /// <summary>
+        /// Gds-code do Firebird para violação de PRIMARY/UNIQUE KEY
+        /// (<c>isc_unique_key_violation</c>), o mesmo valor usado como sinal primário em
+        /// <see cref="UnitOfWork"/> (RL4-01). Confirmado empiricamente contra o Firebird
+        /// embarcado real (ver <see cref="SalvarAlteracoes_ViolacaoDeUniqueVendaId_LancaConcorrenciaException"/>).
+        /// </summary>
+        private const int GdsCodeViolacaoDeChaveUnica = 335544665;
+
+        /// <summary>
+        /// Gds-code de uma violação de CHECK constraint (<c>CK_FIN_VENDA_HIST_OPER</c>),
+        /// usado nos testes abaixo só para provar que ele **não** deve disparar a detecção
+        /// de UNIQUE(VENDA_ID) — mesmo <c>SQLSTATE=23000</c> de <see cref="GdsCodeViolacaoDeChaveUnica"/>
+        /// (ambos são "integrity constraint violation"), mas <c>ErrorCode</c> diferente.
+        /// </summary>
+        private const int GdsCodeViolacaoDeCheckConstraint = 335544558;
+
+        /// <summary>
+        /// Constrói uma <see cref="FbException"/> real, "fake" no sentido de nunca ter vindo
+        /// do servidor Firebird de verdade, para testar isoladamente
+        /// <see cref="UnitOfWork.EhViolacaoDeUniqueVendaId"/> (RL4-01) sem precisar forçar a
+        /// violação real a cada cenário. <see cref="FbException"/> não expõe construtor
+        /// público nem setter de <see cref="FbException.ErrorCode"/>; a investigação empírica
+        /// desta tarefa (decompilação do getter via <c>MethodBody.GetILAsByteArray</c>)
+        /// revelou que <c>FbException.ErrorCode</c> delega para
+        /// <c>(InnerException as FirebirdSql.Data.Common.IscException)?.ErrorCode</c>.
+        /// Construir uma <c>IscException</c> via seu factory interno <c>ForErrorCode</c> e
+        /// passá-la como inner exception do construtor <c>internal FbException(string, Exception)</c>
+        /// reproduz um <see cref="FbException.ErrorCode"/> real e estável — sem abrir conexão
+        /// alguma — enquanto a <see cref="FbException.Message"/> continua sendo exatamente o
+        /// texto passado ao construtor, permitindo simular mensagens que não contêm o texto
+        /// em inglês do engine (locale diferente, mensagem truncada, etc).
+        /// </summary>
+        private static FbException CriarFbExceptionFake(int errorCode, string mensagem)
+        {
+            Exception innerException = null;
+            if (errorCode != 0)
+            {
+                var iscType = typeof(FbException).Assembly.GetType("FirebirdSql.Data.Common.IscException");
+                var forErrorCode = iscType.GetMethod(
+                    "ForErrorCode",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static,
+                    null,
+                    new[] { typeof(int), typeof(Exception) },
+                    null);
+                innerException = (Exception)forErrorCode.Invoke(null, new object[] { errorCode, null });
+            }
+
+            var construtor = typeof(FbException).GetConstructor(
+                BindingFlags.NonPublic | BindingFlags.Instance,
+                null,
+                new[] { typeof(string), typeof(Exception) },
+                null);
+
+            return (FbException)construtor.Invoke(new object[] { mensagem, innerException });
+        }
+
+        /// <summary>
+        /// Invoca via reflexão o método privado <c>UnitOfWork.EhViolacaoDeUniqueVendaId</c>
+        /// (RL4-01) para testá-lo isoladamente, sem precisar passar por
+        /// <see cref="UnitOfWork.SalvarAlteracoes"/>/<c>DbContext.SaveChanges()</c> reais.
+        /// </summary>
+        private static bool InvocarEhViolacaoDeUniqueVendaId(Exception excecao)
+        {
+            var metodo = typeof(UnitOfWork).GetMethod("EhViolacaoDeUniqueVendaId", BindingFlags.NonPublic | BindingFlags.Static);
+            return (bool)metodo.Invoke(null, new object[] { excecao });
+        }
+
+        [Fact]
+        public void EhViolacaoDeUniqueVendaId_ErrorCodeBateSemTextoEmIngles_DetectaViaErrorCode()
+        {
+            // Mensagem propositalmente sem nenhum dos termos em inglês checados pelo
+            // fallback ("violation", "unique", "PRIMARY or UNIQUE KEY constraint") — só o
+            // nome da constraint (não-localizado) e o ErrorCode devem bastar para detectar.
+            var fbExcecao = CriarFbExceptionFake(
+                GdsCodeViolacaoDeChaveUnica,
+                "mensagem em outro idioma, envolvendo a restrição UQ_FIN_VENDA_VENDA_ID");
+            var dbUpdateExcecao = new DbUpdateException("erro simulado", fbExcecao);
+
+            bool detectado = InvocarEhViolacaoDeUniqueVendaId(dbUpdateExcecao);
+
+            Assert.True(detectado, "Deveria detectar via ErrorCode mesmo sem o texto em inglês da mensagem (RL4-01: ErrorCode é o sinal primário).");
+        }
+
+        [Fact]
+        public void EhViolacaoDeUniqueVendaId_ErrorCodeAusente_CaiNoFallbackDeTextoEmIngles()
+        {
+            // ErrorCode=0 (não setado) simula um provider/versão futura sem o ErrorCode
+            // esperado; a mensagem em inglês do próprio Firebird (capturada em execução real,
+            // ver SalvarAlteracoes_ViolacaoDeUniqueVendaId_LancaConcorrenciaException) precisa
+            // continuar funcionando como fallback (RL4-01: "mantendo o texto como fallback").
+            var fbExcecao = CriarFbExceptionFake(
+                0,
+                "violation of PRIMARY or UNIQUE KEY constraint \"UQ_FIN_VENDA_VENDA_ID\" on table \"FIN_VENDA\"");
+            var dbUpdateExcecao = new DbUpdateException("erro simulado", fbExcecao);
+
+            bool detectado = InvocarEhViolacaoDeUniqueVendaId(dbUpdateExcecao);
+
+            Assert.True(detectado, "Fallback por mensagem em inglês deve continuar funcionando quando o ErrorCode não bate.");
+        }
+
+        [Fact]
+        public void EhViolacaoDeUniqueVendaId_ErrorCodeDeOutraViolacao_NaoDetectaMesmoComMesmoSqlstate()
+        {
+            // GdsCodeViolacaoDeCheckConstraint tem o mesmo SQLSTATE=23000 de
+            // GdsCodeViolacaoDeChaveUnica (achado desta tarefa) — prova que o sinal primário
+            // precisa ser o ErrorCode, não o SQLSTATE (SQLSTATE sozinho não distinguiria os
+            // dois casos).
+            var fbExcecao = CriarFbExceptionFake(
+                GdsCodeViolacaoDeCheckConstraint,
+                "mensagem sem relação com UQ_FIN_VENDA_VENDA_ID");
+            var dbUpdateExcecao = new DbUpdateException("erro simulado", fbExcecao);
+
+            bool detectado = InvocarEhViolacaoDeUniqueVendaId(dbUpdateExcecao);
+
+            Assert.False(detectado, "ErrorCode de uma violação diferente (CHECK) não deveria ser tratado como UNIQUE(VENDA_ID), mesmo com mensagem/SQLSTATE parecidos.");
+        }
+
         [Fact]
         public void SalvarAlteracoes_FalhaInjetadaNoHistorico_FazRollbackDaVendaInteira()
         {

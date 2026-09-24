@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using ERPFinanceiro.Api;
 using ERPFinanceiro.Desktop;
 using Owin;
 using Xunit;
@@ -23,6 +24,12 @@ namespace ERPFinanceiro.Tests.Desktop
     /// </summary>
     public class ApiHostTests
     {
+        /// <summary>
+        /// T-35: mesmo valor de <c>Api:ApiKey</c> do <c>App.config</c> local (gitignorado)
+        /// de <c>ERPFinanceiro.Tests</c> — ver <c>App.config.example</c> do Desktop.
+        /// </summary>
+        private const string ChaveApiKeyDeTeste = "CHAVE_LOCAL_TESTE_T32";
+
         private static readonly Action<IAppBuilder> PipelineDeTeste = app =>
             app.Run(contexto =>
             {
@@ -142,6 +149,12 @@ namespace ERPFinanceiro.Tests.Desktop
 
                     using (var client = new HttpClient())
                     {
+                        // T-35: ApiKeyHandler agora roda antes do roteamento — sem
+                        // X-Api-Key esta requisição pegaria 401 antes de chegar a "não
+                        // mapeada" (404). Header presente para continuar exercitando o
+                        // cenário original deste teste (rota inexistente).
+                        client.DefaultRequestHeaders.Add(ApiKeyHandler.HeaderName, ChaveApiKeyDeTeste);
+
                         HttpResponseMessage resposta = await client.GetAsync(
                             $"http://localhost:{porta}/api/rota-inexistente-neste-lote");
 

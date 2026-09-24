@@ -46,6 +46,7 @@ namespace ERPFinanceiro.Api
             ConfigurarSerializacaoJson(config);
             ConfigurarAutofac(config);
             ConfigurarCorrelationId(config);
+            ConfigurarApiKey(config);
             ConfigurarExceptionHandler(config);
 
             app.UseWebApi(config);
@@ -70,6 +71,20 @@ namespace ERPFinanceiro.Api
         private static void ConfigurarCorrelationId(HttpConfiguration config)
         {
             config.MessageHandlers.Add(new CorrelationIdHandler(new CorrelationContext()));
+        }
+
+        /// <summary>
+        /// Registra o <see cref="ApiKeyHandler"/> (T-35) como message handler global —
+        /// roda antes do roteamento de controller (mesmo mecanismo de
+        /// <see cref="CorrelationIdHandler"/> acima, adicionado depois dele para que o
+        /// <c>X-Correlation-Id</c> já esteja populado quando o log de tentativa não
+        /// autorizada for gravado), garantindo que nenhuma rota autenticável escape da
+        /// checagem de <c>X-Api-Key</c> (contrato v1.1 Seção 2, isenta só
+        /// <c>GET /api/health</c>, T-36).
+        /// </summary>
+        private static void ConfigurarApiKey(HttpConfiguration config)
+        {
+            config.MessageHandlers.Add(new ApiKeyHandler());
         }
 
         private static void ConfigurarRoteamento(HttpConfiguration config)

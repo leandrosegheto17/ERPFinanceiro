@@ -22,6 +22,14 @@
          compilação do esqueleto; troca para o pacote comercial Trial é decisão de T-49 quando
          houver ambiente com GUI para confirmar preview (ver docs/licencas.md, RL1-03). -->
     <PackageReference Include="FastReport.OpenSource" Version="2023.3.13" />
+    <!-- T-49: export PDF do Open Source e pacote separado (MIT, mesma versao do base). Verificado por
+         execucao: gera PDF headless em net48. Ver nota de T-49 no TASK.md. -->
+    <PackageReference Include="FastReport.OpenSource.Export.PdfSimple" Version="2023.3.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Layout embutido no assembly (T-53 nao precisa empacotar arquivo separado). -->
+    <EmbeddedResource Include="Layouts\RelatorioListagem.frx" LogicalName="ERPFinanceiro.Reports.Layouts.RelatorioListagem.frx" />
   </ItemGroup>
 
 </Project>

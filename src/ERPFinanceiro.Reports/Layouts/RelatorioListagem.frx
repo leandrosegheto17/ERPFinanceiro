@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Report ScriptLanguage="CSharp" DoublePass="true" ReportInfo.Description="Relatorio financeiro de vendas - listagem (T-49, UX-SPEC 2.3)">
+  <!-- Unico ponto do layout onde cores sao definidas (estilos centralizados: preto/cinza de impressao).
+       Nenhum controle abaixo tem Color/Fill literal; todos referenciam estilo por nome (TASK.md Secao 1). -->
+  <Styles>
+    <Style Name="Texto" Font="Arial, 8pt"/>
+    <Style Name="Titulo" Font="Arial, 14pt, style=Bold"/>
+    <Style Name="Cabecalho" Font="Arial, 8pt, style=Bold" Fill.Color="Gainsboro" Border.Lines="All"/>
+    <Style Name="Linha" Font="Arial, 8pt" Border.Lines="Bottom"/>
+    <Style Name="Total" Font="Arial, 10pt, style=Bold" Border.Lines="Top"/>
+  </Styles>
+  <Dictionary>
+    <TableDataSource Name="Linhas" ReferenceName="Dados.Linhas" DataType="System.Int32" Enabled="true">
+      <Column Name="VendaId" DataType="System.String"/>
+      <Column Name="ClienteId" DataType="System.String"/>
+      <Column Name="Valor" DataType="System.String"/>
+      <Column Name="Status" DataType="System.String"/>
+      <Column Name="Recebida" DataType="System.String"/>
+      <Column Name="Quitada" DataType="System.String"/>
+      <Column Name="Cancelada" DataType="System.String"/>
+    </TableDataSource>
+    <Parameter Name="Filtro" DataType="System.String"/>
+    <Parameter Name="EmitidoEm" DataType="System.String"/>
+    <Parameter Name="TotalListado" DataType="System.String"/>
+    <Parameter Name="NotaNulos" DataType="System.String"/>
+    <Parameter Name="MensagemVazia" DataType="System.String"/>
+  </Dictionary>
+  <ReportPage Name="Page1" Watermark.Font="Arial, 60pt">
+    <ReportTitleBand Name="ReportTitle1" Width="718.2" Height="66">
+      <TextObject Name="TxtTitulo" Width="480" Height="24" Text="RELATÓRIO FINANCEIRO DE VENDAS" Style="Titulo"/>
+      <TextObject Name="TxtEmissao" Left="480" Width="238.2" Height="24" Text="Emitido em [EmitidoEm]" HorzAlign="Right" Style="Texto"/>
+      <TextObject Name="TxtFiltro" Top="30" Width="718.2" Height="30" Text="Filtro: [Filtro]" Style="Texto"/>
+    </ReportTitleBand>
+    <PageHeaderBand Name="PageHeader1" Top="70" Width="718.2" Height="20">
+      <TextObject Name="CabVendaId" Width="80" Height="20" Text="VendaId" Style="Cabecalho"/>
+      <TextObject Name="CabClienteId" Left="80" Width="80" Height="20" Text="ClienteId" Style="Cabecalho"/>
+      <TextObject Name="CabValor" Left="160" Width="90" Height="20" Text="Valor" HorzAlign="Right" Style="Cabecalho"/>
+      <TextObject Name="CabStatus" Left="250" Width="78" Height="20" Text="Status" Style="Cabecalho"/>
+      <TextObject Name="CabRecebida" Left="328" Width="130" Height="20" Text="Recebida" Style="Cabecalho"/>
+      <TextObject Name="CabQuitada" Left="458" Width="130" Height="20" Text="Quitada" Style="Cabecalho"/>
+      <TextObject Name="CabCancelada" Left="588" Width="130.2" Height="20" Text="Cancelada" Style="Cabecalho"/>
+    </PageHeaderBand>
+    <DataBand Name="Data1" Top="94" Width="718.2" Height="18" DataSource="Linhas">
+      <TextObject Name="TxtVendaId" Width="80" Height="18" Text="[Linhas.VendaId]" Style="Linha"/>
+      <TextObject Name="TxtClienteId" Left="80" Width="80" Height="18" Text="[Linhas.ClienteId]" Style="Linha"/>
+      <TextObject Name="TxtValor" Left="160" Width="90" Height="18" Text="[Linhas.Valor]" HorzAlign="Right" Style="Linha"/>
+      <TextObject Name="TxtStatus" Left="250" Width="78" Height="18" Text="[Linhas.Status]" Style="Linha"/>
+      <TextObject Name="TxtRecebida" Left="328" Width="130" Height="18" Text="[Linhas.Recebida]" Style="Linha"/>
+      <TextObject Name="TxtQuitada" Left="458" Width="130" Height="18" Text="[Linhas.Quitada]" Style="Linha"/>
+      <TextObject Name="TxtCancelada" Left="588" Width="130.2" Height="18" Text="[Linhas.Cancelada]" Style="Linha"/>
+    </DataBand>
+    <ReportSummaryBand Name="ReportSummary1" Top="116" Width="718.2" Height="80">
+      <TextObject Name="TxtVazio" Width="718.2" Height="20" Text="[MensagemVazia]" Style="Texto"/>
+      <TextObject Name="TxtTotal" Top="24" Width="718.2" Height="22" Text="Total listado:   R$ [TotalListado]  (soma dos valores listados)" Style="Total"/>
+      <TextObject Name="TxtNotaNulos" Top="50" Width="718.2" Height="28" Text="[NotaNulos]" Style="Texto"/>
+    </ReportSummaryBand>
+    <PageFooterBand Name="PageFooter1" Top="200" Width="718.2" Height="20">
+      <TextObject Name="TxtPagina" Width="718.2" Height="20" Text="Página [Page] de [TotalPages]" HorzAlign="Right" Style="Texto"/>
+    </PageFooterBand>
+  </ReportPage>
+</Report>

@@ -37,6 +37,9 @@ namespace ERPFinanceiro.Api.Erros
         private const string MensagemGenericaErroInterno =
             "Ocorreu um erro interno inesperado. Consulte o suporte informando o horário da operação.";
 
+        private const string MensagemConflitoConcorrencia =
+            "Conflito de concorrência ao processar a operação; tente novamente.";
+
         public static RespostaErroMapeada Mapear(Exception excecao)
         {
             if (excecao == null)
@@ -73,6 +76,16 @@ namespace ERPFinanceiro.Api.Erros
                 // não sobre a Api poder usar o código).
                 case ApplicationExceptions.DadosDivergentesException dadosDivergentes:
                     return Envelope(HttpStatusCode.Conflict, "DADOS_DIVERGENTES", dadosDivergentes.Message, dadosDivergentes);
+
+                // RL1-01a (achado ao trabalhar em RL1-01, documentação): T-16
+                // (ExecutarComRetry) deixa propagar ConcorrenciaException (T-15) após
+                // esgotar as 3 tentativas de retry por conflito de concorrência —
+                // aqui é onde essa exceção é traduzida para 409 CONFLITO_CONCORRENCIA
+                // (docs/contrato-v1.1.md Seção 2, TASK.md Seção 1 regra 9). Mensagem ao
+                // cliente é genérica (regra 7: sem detalhe interno), mas indica que a
+                // operação pode ser tentada novamente.
+                case ApplicationExceptions.ConcorrenciaException concorrencia:
+                    return Envelope(HttpStatusCode.Conflict, "CONFLITO_CONCORRENCIA", MensagemConflitoConcorrencia, concorrencia);
 
                 default:
                     // Qualquer exceção não mapeada: 500 ERRO_INTERNO com mensagem

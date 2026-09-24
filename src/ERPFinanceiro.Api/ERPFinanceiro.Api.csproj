@@ -27,4 +27,15 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- T-35: ApiKeyHandler lê "Api:ApiKey" direto de App.config (appSettings) via
+         ConfigurationManager — mesma exceção documentada em ERPFinanceiro.Desktop.csproj
+         para "Api:Porta"/"Log:CaminhoArquivo" (SDD.md Seção "Configuração"): a chave é
+         uma preocupação da própria Api (autenticação do seu pipeline HTTP), não do
+         domínio/aplicação, então lê o .config diretamente em vez de passar por
+         IConfiguracaoBanco (que é só para Banco:*) ou por uma nova interface só para
+         isto (over-engineering para 1 valor lido 1 vez por requisição). -->
+    <Reference Include="System.Configuration" />
+  </ItemGroup>
+
 </Project>

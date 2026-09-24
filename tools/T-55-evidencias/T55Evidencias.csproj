@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Harness descartavel (T-55): gera as evidencias (prints reais da tela + PDF) sobre o seed real.
+       Fora da ERPFinanceiro.sln; nao e codigo de producao. Rodar via Executar.ps1. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <RootNamespace>T55Evidencias</RootNamespace>
+    <AssemblyName>T55Evidencias</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ERPFinanceiro.Application\ERPFinanceiro.Application.csproj" />
+    <ProjectReference Include="..\..\src\ERPFinanceiro.Infrastructure\ERPFinanceiro.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\ERPFinanceiro.Api\ERPFinanceiro.Api.csproj" />
+    <ProjectReference Include="..\..\src\ERPFinanceiro.Reports\ERPFinanceiro.Reports.csproj" />
+    <ProjectReference Include="..\..\src\ERPFinanceiro.Desktop\ERPFinanceiro.Desktop.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Autofac" Version="6.5.0" />
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="10.3.4" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+</Project>

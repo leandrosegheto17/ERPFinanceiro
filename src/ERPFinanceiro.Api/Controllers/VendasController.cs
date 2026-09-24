@@ -52,7 +52,6 @@ namespace ERPFinanceiro.Api.Controllers
             CancelamentoService cancelamentoService,
             ICorrelationContext correlationContext)
         {
-            _cancelamentoService = cancelamentoService ?? throw new ArgumentNullException(nameof(cancelamentoService));
             _quitacaoService = quitacaoService ?? throw new ArgumentNullException(nameof(quitacaoService));
             _consultaService = consultaService ?? throw new ArgumentNullException(nameof(consultaService));
             _cancelamentoService = cancelamentoService ?? throw new ArgumentNullException(nameof(cancelamentoService));

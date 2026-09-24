@@ -136,7 +136,6 @@ namespace ERPFinanceiro.Tests.Desktop
             using (var host = new ApiHost(container))
             {
                 int porta = ObterPortaLivre();
-                ERPFinanceiro.Api.Startup.ChaveApi = "chave-teste-t35";
                 host.Start(porta);
                 Assert.Equal(EstadoApiHost.Ativa, host.Estado);
 
@@ -224,14 +223,13 @@ namespace ERPFinanceiro.Tests.Desktop
             using (var host = new ApiHost(container))
             {
                 int porta = ObterPortaLivre();
-                ERPFinanceiro.Api.Startup.ChaveApi = "chave-teste-t35";
                 host.Start(porta);
 
                 string url = $"http://localhost:{porta}/api/vendas/cancelamento";
 
                 using (var client = new HttpClient())
                 {
-                    client.DefaultRequestHeaders.Add("X-Api-Key", "chave-teste-t35");
+                    client.DefaultRequestHeaders.Add(ApiKeyHandler.HeaderName, ChaveApiKeyDeTeste);
 
                     // Pendente -> 200 Cancelada
                     var r1 = await client.PostAsync(url, JsonContent(@"{""vendaId"":""V-T32-PEND""}"));
@@ -277,7 +275,6 @@ namespace ERPFinanceiro.Tests.Desktop
             using (var host = new ApiHost(container))
             {
                 int porta = ObterPortaLivre();
-                ERPFinanceiro.Api.Startup.ChaveApi = "chave-teste-t35";
                 host.Start(porta);
                 Assert.Equal(EstadoApiHost.Ativa, host.Estado);
 
@@ -285,7 +282,7 @@ namespace ERPFinanceiro.Tests.Desktop
 
                 using (var client = new HttpClient())
                 {
-                    client.DefaultRequestHeaders.Add("X-Api-Key", "chave-teste-t35");
+                    client.DefaultRequestHeaders.Add(ApiKeyHandler.HeaderName, ChaveApiKeyDeTeste);
 
                     HttpResponseMessage r1 = await client.GetAsync($"{baseUrl}/{vendaIdCancelada}/status");
                     Assert.Equal(HttpStatusCode.OK, r1.StatusCode);

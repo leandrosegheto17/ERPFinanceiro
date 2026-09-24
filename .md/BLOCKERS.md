@@ -303,3 +303,25 @@
 - Status: Resolvido (parcialmente) — compilação/testes não-visuais liberados;
   verificação visual permanece etapa manual do usuário. Fila de Frontend
   (T-42 em diante) retomada em 23/09/2026.
+
+## Nota operacional 004 — 23/09/2026 (causa provável da intermitência da suíte; ver RL10-06)
+- Reportado por: orquestrador, ao integrar Lotes 7-10 na `main`.
+- Sintoma: falhas em cadeia e não determinísticas na suíte (dezenas de testes, inclusive
+  `DbInitializerTests`, sem relação com o código alterado), com
+  `FbException: Your user name and password are not defined`, ou `WaitForSingleObject failed`.
+  Reproduzido no mesmo binário que antes passava 224/224; passa a falhar depois de algumas
+  rodadas e não se corrige apagando `.fdb`/copiando a pasta de teste de novo.
+- Causa provável (evidência): esta máquina tem o **serviço Windows `FirebirdServerDefaultInstance`
+  (Automático, sempre ativo)**. O Firebird embarcado dos testes divide com ele os arquivos de lock
+  em `C:\ProgramData\firebird` (`fb_lock_*`, `fb12_monitor_*`, `fb_user_mapping`); o serviço mantém
+  esses arquivos em uso, e o embarcado passa a falhar ao criar/abrir bancos.
+- Contorno validado (não altera o serviço, só o processo de teste): isolar o motor embarcado com
+  as variáveis oficiais do Firebird, apontando `FIREBIRD` para a pasta de teste (que já contém
+  `firebird.conf`, `security3.fdb`, `plugins`, `intl`) e `FIREBIRD_LOCK` para uma pasta de lock
+  exclusiva, criada antes:
+  `FIREBIRD='C:\temp_erp_x' FIREBIRD_LOCK='C:\temp_fb_lock_x' dotnet vstest ERPFinanceiro.Tests.dll`
+  Resultado: com isolamento, 224/224 em duas rodadas seguidas, após 3 rodadas sem isolamento que
+  falharam (72 e 96 falhas; e `DbInitializerTests` 0/3). Recomenda-se usar sempre esta forma nas
+  execuções da suíte nesta máquina (e considerar fixá-la num script de teste do repositório).
+- Status: Contornado. Pendente a decisão de tornar o isolamento parte do repositório (script ou
+  `runsettings`), para não depender de quem roda os testes.

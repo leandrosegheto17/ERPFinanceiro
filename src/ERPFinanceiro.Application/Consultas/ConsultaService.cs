@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using ERPFinanceiro.Application.Exceptions;
 using ERPFinanceiro.Application.Interfaces;
+using ERPFinanceiro.Application.Validacao;
 using ERPFinanceiro.Domain.Entities;
 using ERPFinanceiro.Domain.Exceptions;
 
@@ -60,7 +62,10 @@ namespace ERPFinanceiro.Application.Consultas
                     "ConsultaService.Listar requer IVendaConsultaLeitura (parâmetro 'leitura' do construtor, T-23).");
             }
 
-            IReadOnlyList<Venda> vendas = _leitura.ListarMaisRecentes(LimiteListagem + 1);
+            ValidarFiltro(filtro);
+            IReadOnlyList<Venda> vendas = (filtro == null || filtro.SemCriterios)
+                ? _leitura.ListarMaisRecentes(LimiteListagem + 1)
+                : _leitura.ListarMaisRecentes(filtro, LimiteListagem + 1);
 
             bool truncado = vendas.Count > LimiteListagem;
             IEnumerable<Venda> pagina = truncado ? vendas.Take(LimiteListagem) : vendas;
@@ -95,7 +100,10 @@ namespace ERPFinanceiro.Application.Consultas
                     "ConsultaService.ListarParaRelatorio requer IVendaConsultaLeitura (parâmetro 'leitura' do construtor, T-23/T-48).");
             }
 
-            IReadOnlyList<Venda> vendas = _leitura.ListarTodas();
+            ValidarFiltro(filtro);
+            IReadOnlyList<Venda> vendas = (filtro == null || filtro.SemCriterios)
+                ? _leitura.ListarTodas()
+                : _leitura.ListarTodas(filtro);
 
             List<LinhaRelatorio> linhas = vendas.Select(MapearParaLinhaRelatorio).ToList();
 
@@ -103,6 +111,17 @@ namespace ERPFinanceiro.Application.Consultas
             int quantidadeSemValor = linhas.Count(l => l.ValorTotal == null);
 
             return new ResultadoRelatorioVendas(linhas, totalListado, quantidadeSemValor);
+        }
+
+        /// <summary>Período inicial &gt; final -> <see cref="ValidacaoException"/> (PERIODO_INVALIDO).</summary>
+        private static void ValidarFiltro(FiltroVendas filtro)
+        {
+            if (filtro != null && filtro.PeriodoInicioUtc.HasValue && filtro.PeriodoFimUtc.HasValue
+                && filtro.PeriodoInicioUtc.Value > filtro.PeriodoFimUtc.Value)
+            {
+                throw new ValidacaoException(new ErroValidacao(
+                    "PERIODO_INVALIDO", "O período inicial não pode ser posterior ao período final."));
+            }
         }
 
         private static LinhaRelatorio MapearParaLinhaRelatorio(Venda venda)

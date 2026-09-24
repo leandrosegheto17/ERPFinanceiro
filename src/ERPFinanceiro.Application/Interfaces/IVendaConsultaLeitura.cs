@@ -34,5 +34,11 @@ namespace ERPFinanceiro.Application.Interfaces
         /// <c>ConsultaService.ListarParaRelatorio</c> (T-48).
         /// </summary>
         IReadOnlyList<Venda> ListarTodas();
+
+        /// <summary>Como <see cref="ListarMaisRecentes(int)"/>, aplicando o filtro no banco antes do Take (T-57).</summary>
+        IReadOnlyList<Venda> ListarMaisRecentes(ERPFinanceiro.Application.Consultas.FiltroVendas filtro, int quantidadeMaxima);
+
+        /// <summary>Como <see cref="ListarTodas()"/>, aplicando o filtro (T-57).</summary>
+        IReadOnlyList<Venda> ListarTodas(ERPFinanceiro.Application.Consultas.FiltroVendas filtro);
     }
 }

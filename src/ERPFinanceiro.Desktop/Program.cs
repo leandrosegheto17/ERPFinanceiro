@@ -83,8 +83,9 @@ namespace ERPFinanceiro.Desktop
 
                 var detalhe = new DetalheVendaPresenter(
                     DetalheVendaPresenter.CarregadorViaContainer(raiz), ex => registrar("Falha ao carregar detalhe da venda (F-3)", ex));
+                var filtros = new FiltrosConsultaModelo(); // T-58: filtro corrente compartilhado por grid e relatório
                 var consulta = new ConsultaVendasPresenter(
-                    ConsultaVendasPresenter.CarregadorViaContainer(raiz), ex => registrar("Falha ao carregar consulta de vendas (F-1)", ex));
+                    ConsultaVendasPresenter.CarregadorViaContainer(raiz, () => filtros.Corrente), ex => registrar("Falha ao carregar consulta de vendas (F-1)", ex));
 
                 var janela = new FrmConsulta(consulta) { DetalhePresenter = detalhe };
                 var inst = instancia;
@@ -94,7 +95,7 @@ namespace ERPFinanceiro.Desktop
                     liberarInstancia: () => inst?.Dispose(),
                     aoFalhar: ex => registrar("Falha no encerramento", ex),
                     fluxoRelatorio: CriarFluxoRelatorio(raiz, registrar),
-                    filtroCorrente: () => new ERPFinanceiro.Application.Consultas.FiltroVendas()); // T-58 (Tier B) trará o filtro real
+                    filtroCorrente: () => filtros.Corrente, filtros: filtros); // T-58: relatório usa o filtro real do painel
 
                 System.Windows.Forms.Application.Run(janela);
                 return 0;

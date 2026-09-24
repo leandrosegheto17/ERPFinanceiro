@@ -141,14 +141,14 @@ namespace ERPFinanceiro.Desktop
         /// Carregador de produção: abre um escopo Autofac novo por operação (regra 5/RT-08 — nunca
         /// compartilha <c>DbContext</c> entre operações), resolve <see cref="ConsultaService"/> e lista.
         /// </summary>
-        public static Func<ResultadoListagemVendas> CarregadorViaContainer(IContainer container)
+        public static Func<ResultadoListagemVendas> CarregadorViaContainer(IContainer container, Func<FiltroVendas> filtroCorrente = null)
         {
             if (container == null) throw new ArgumentNullException(nameof(container));
             return () =>
             {
                 using (ILifetimeScope escopo = container.BeginLifetimeScope())
                 {
-                    return escopo.Resolve<ConsultaService>().Listar(new FiltroVendas());
+                    return escopo.Resolve<ConsultaService>().Listar(filtroCorrente?.Invoke() ?? new FiltroVendas());
                 }
             };
         }

@@ -10,6 +10,49 @@ using Xunit;
 
 namespace ERPFinanceiro.Tests.Reports
 {
+    /// <summary>Totais por status (T-59, S-07/CA-07.3) com repositório mockado, sem Firebird.</summary>
+    public class RelatorioDataSourceTotaisTests
+    {
+        private static readonly DateTime D = new DateTime(2026, 9, 1, 10, 0, 0, DateTimeKind.Utc);
+
+        private static RelatorioDataSource Fonte()
+        {
+            var v1001 = Venda.CriarPorQuitacao("V-1001", "CLI-001", 500.50m,
+                new[] { new VendaItem("P1", 2, 150.0000m) }, D, D.AddDays(2));
+            var v1002 = Venda.CriarPendente("V-1002", "CLI-002", 450.50m,
+                new[] { new VendaItem("P3", 3, 100.0000m) }, D.AddDays(4));
+            var v1003 = Venda.CriarCancelada("V-1003", "desconhecida", D.AddDays(6));
+
+            var leitura = new Moq.Mock<IVendaConsultaLeitura>();
+            leitura.Setup(l => l.ListarTodas())
+                .Returns(new System.Collections.Generic.List<Venda> { v1003, v1002, v1001 });
+            return new RelatorioDataSource(new ConsultaService(new Moq.Mock<IVendaRepository>().Object, leitura.Object));
+        }
+
+        [Fact]
+        public void ObterTotais_ComSeed_SomaPorStatusConfereComTotalListado()
+        {
+            var t = Fonte().ObterTotais(new FiltroVendas());
+
+            Assert.Equal(500.50m, t.Quitado.Valor);
+            Assert.Equal(1, t.Quitado.Quantidade);
+            Assert.Equal(0m, t.Cancelado.Valor); // nulo = 0
+            Assert.Equal(1, t.Cancelado.Quantidade);
+            Assert.Equal(450.50m, t.Pendente.Valor);
+            Assert.Equal(951.00m, t.TotalListado);
+            Assert.Equal(t.TotalListado, t.Quitado.Valor + t.Cancelado.Valor + t.Pendente.Valor);
+        }
+
+        [Fact]
+        public void ObterTotais_D03Rejeitada_OmitePendente()
+        {
+            var t = Fonte().ObterTotais(new FiltroVendas(), incluirPendente: false);
+
+            Assert.Null(t.Pendente);
+            Assert.Equal(500.50m, t.Quitado.Valor);
+        }
+    }
+
     /// <summary>
     /// Teste de integração real (T-48) de <see cref="RelatorioDataSource"/> contra
     /// Firebird embarcado real, mesmo mecanismo de schema/conexão já usado por

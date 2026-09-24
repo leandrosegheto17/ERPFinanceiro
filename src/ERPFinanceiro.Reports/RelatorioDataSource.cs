@@ -1,5 +1,6 @@
 using System;
 using ERPFinanceiro.Application.Consultas;
+using ERPFinanceiro.Domain.Enums;
 
 namespace ERPFinanceiro.Reports
 {
@@ -39,6 +40,68 @@ namespace ERPFinanceiro.Reports
         public ResultadoRelatorioVendas Obter(FiltroVendas filtro)
         {
             return _consultaService.ListarParaRelatorio(filtro ?? new FiltroVendas());
+        }
+
+        /// <summary>
+        /// Totais por status para o bloco de totais do relatório (S-07/CA-07.2, UX-SPEC 2.3),
+        /// calculados da <b>mesma lista</b> de <see cref="Obter"/> (nulos = 0), de modo que
+        /// quitado + cancelado + pendente = <see cref="ResultadoRelatorioVendas.TotalListado"/>
+        /// (CA-07.3). <paramref name="incluirPendente"/> (D-03, A VALIDAR): com D-03 rejeitada,
+        /// passar <c>false</c> omite a linha pendente (<see cref="TotaisRelatorioVendas.Pendente"/>
+        /// nulo); nesse caso a soma dos totais exibidos não inclui as vendas pendentes.
+        /// </summary>
+        public TotaisRelatorioVendas ObterTotais(FiltroVendas filtro, bool incluirPendente = true)
+        {
+            ResultadoRelatorioVendas resultado = Obter(filtro);
+
+            TotalPorStatus Somar(StatusVenda status)
+            {
+                decimal total = 0m;
+                int quantidade = 0;
+                foreach (LinhaRelatorio linha in resultado.Linhas)
+                {
+                    if (linha.Status != status) continue;
+                    total += linha.ValorTotal ?? 0m;
+                    quantidade++;
+                }
+                return new TotalPorStatus(total, quantidade);
+            }
+
+            return new TotaisRelatorioVendas(
+                Somar(StatusVenda.Quitada),
+                Somar(StatusVenda.Cancelada),
+                incluirPendente ? Somar(StatusVenda.Pendente) : null,
+                resultado.TotalListado);
+        }
+    }
+
+    /// <summary>Soma (nulos = 0) e contagem de vendas de um status.</summary>
+    public sealed class TotalPorStatus
+    {
+        public decimal Valor { get; }
+        public int Quantidade { get; }
+
+        public TotalPorStatus(decimal valor, int quantidade)
+        {
+            Valor = valor;
+            Quantidade = quantidade;
+        }
+    }
+
+    /// <summary>Totais por status + Total listado (UX-SPEC 2.3). <see cref="Pendente"/> nulo = linha omitida (D-03).</summary>
+    public sealed class TotaisRelatorioVendas
+    {
+        public TotalPorStatus Quitado { get; }
+        public TotalPorStatus Cancelado { get; }
+        public TotalPorStatus Pendente { get; }
+        public decimal TotalListado { get; }
+
+        public TotaisRelatorioVendas(TotalPorStatus quitado, TotalPorStatus cancelado, TotalPorStatus pendente, decimal totalListado)
+        {
+            Quitado = quitado;
+            Cancelado = cancelado;
+            Pendente = pendente;
+            TotalListado = totalListado;
         }
     }
 }

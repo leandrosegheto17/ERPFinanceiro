@@ -84,6 +84,12 @@ namespace ERPFinanceiro.Desktop
         public void Start(int porta)
         {
             Startup.Container = _container;
+            // T-35: chave lida do App.config (Api:ApiKey); um valor já atribuído (teste) prevalece.
+            if (string.IsNullOrEmpty(Startup.ChaveApi))
+            {
+                Startup.ChaveApi = System.Configuration.ConfigurationManager.AppSettings["Api:ApiKey"];
+            }
+
             Start(porta, () => WebApp.Start<Startup>($"http://localhost:{porta}/"));
         }
 

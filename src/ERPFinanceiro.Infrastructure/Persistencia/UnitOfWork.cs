@@ -102,7 +102,7 @@ namespace ERPFinanceiro.Infrastructure.Persistencia
         /// uma eventual UNIQUE diferente adicionada no futuro a outra tabela do mesmo
         /// schema (o <c>ErrorCode</c> por si só não identifica qual constraint violou).
         /// </summary>
-        private static bool EhViolacaoDeUniqueVendaId(Exception excecao)
+        internal static bool EhViolacaoDeUniqueVendaId(Exception excecao)
         {
             for (var atual = excecao; atual != null; atual = atual.InnerException)
             {
@@ -140,6 +140,7 @@ namespace ERPFinanceiro.Infrastructure.Persistencia
         /// </summary>
         private static bool MensagemIndicaViolacaoDeChaveUnica(string mensagem)
         {
+            string mensagem = fb.Message;
             if (string.IsNullOrEmpty(mensagem))
             {
                 return false;

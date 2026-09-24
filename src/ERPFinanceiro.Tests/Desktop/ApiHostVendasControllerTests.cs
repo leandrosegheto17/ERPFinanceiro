@@ -214,6 +214,66 @@ namespace ERPFinanceiro.Tests.Desktop
         }
 
         [Fact]
+        public async Task PostVendas_RegistraPendenteIdempotenteAliasV1E400_ECobraHistoricoNaQuitacaoPosterior()
+        {
+            using (Autofac.IContainer container = CompositionRoot.Construir())
+            using (var host = new ApiHost(container))
+            {
+                int porta = ObterPortaLivre();
+                host.Start(porta);
+
+                string url = $"http://localhost:{porta}/api/vendas";
+                string corpo = @"{ ""vendaId"": ""V-T62-001"", ""clienteId"": ""C-T62"", ""valorTotal"": 10.00,
+                    ""itens"": [ { ""produtoId"": ""P-T62"", ""quantidade"": 1, ""precoUnitario"": 10.00 } ] }";
+
+                using (var client = new HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add(ApiKeyHandler.HeaderName, ChaveApiKeyDeTeste);
+
+                    var r1 = await client.PostAsync(url, JsonContent(corpo));
+                    Assert.Equal(HttpStatusCode.OK, r1.StatusCode);
+                    Assert.Equal("Pendente", (string)JObject.Parse(await r1.Content.ReadAsStringAsync())["status"]);
+
+                    // Repeticao -> 200 com status atual.
+                    var r2 = await client.PostAsync(url, JsonContent(corpo));
+                    Assert.Equal(HttpStatusCode.OK, r2.StatusCode);
+                    Assert.Equal("Pendente", (string)JObject.Parse(await r2.Content.ReadAsStringAsync())["status"]);
+
+                    // Alias v1.
+                    var r3 = await client.PostAsync($"http://localhost:{porta}/api/v1/vendas", JsonContent(corpo));
+                    Assert.Equal(HttpStatusCode.OK, r3.StatusCode);
+                    Assert.Equal("Pendente", (string)JObject.Parse(await r3.Content.ReadAsStringAsync())["status"]);
+
+                    // Payload invalido -> 400.
+                    var r4 = await client.PostAsync(url, JsonContent(@"{ ""vendaId"": ""V-T62-INV"", ""valorTotal"": 0, ""itens"": [] }"));
+                    Assert.Equal(HttpStatusCode.BadRequest, r4.StatusCode);
+                    Assert.Equal("PAYLOAD_INVALIDO", (string)JObject.Parse(await r4.Content.ReadAsStringAsync())["erro"]["codigo"]);
+
+                    // Quitacao posterior via T-30 -> Quitada; repeticao do registro devolve status atual.
+                    var rq = await client.PostAsync($"{url}/quitacao", JsonContent(corpo));
+                    Assert.Equal(HttpStatusCode.OK, rq.StatusCode);
+                    Assert.Equal("Quitada", (string)JObject.Parse(await rq.Content.ReadAsStringAsync())["status"]);
+
+                    var r5 = await client.PostAsync(url, JsonContent(corpo));
+                    Assert.Equal(HttpStatusCode.OK, r5.StatusCode);
+                    Assert.Equal("Quitada", (string)JObject.Parse(await r5.Content.ReadAsStringAsync())["status"]);
+                }
+
+                host.Stop();
+            }
+
+            // Historico de quitacao gerado (Pendente -> Quitada).
+            using (var conn = AbrirConexao())
+            using (var ctx = new FinanceiroDbContext(conn))
+            {
+                var venda = new VendaRepository(ctx).ObterPorVendaId("V-T62-001");
+                Assert.NotNull(venda);
+                Assert.Equal(1, System.Linq.Enumerable.Count(venda.Historico, h => h.Operacao == ERPFinanceiro.Domain.Enums.Operacao.Quitacao));
+                Assert.Equal(1, System.Linq.Enumerable.Count(venda.Historico, h => h.Operacao == ERPFinanceiro.Domain.Enums.Operacao.Recebida));
+            }
+        }
+
+        [Fact]
         public async Task PostCancelamento_PipelineHttpCompleto_CobreOsCenariosDoContratoV11()
         {
             SemearVenda("V-T32-PEND", quitar: false);

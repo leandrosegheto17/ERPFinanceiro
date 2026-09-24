@@ -139,6 +139,7 @@ namespace ERPFinanceiro.Desktop
         {
             builder.RegisterType<QuitacaoService>().InstancePerLifetimeScope();
             builder.RegisterType<CancelamentoService>().InstancePerLifetimeScope();
+            builder.RegisterType<RegistroService>().InstancePerLifetimeScope();
             builder.RegisterType<ConsultaService>().InstancePerLifetimeScope();
         }
 

@@ -26,6 +26,11 @@ namespace ERPFinanceiro.Desktop
 
             InstanciaUnica instancia = null;
             ApiHost host = null;
+            IAppLogger loggerGlobal = null; // RL10-02: capturado antes do descarte do container
+            var tratador = new TratadorExcecoesNaoTratadas(
+                (contexto, ex) => RegistrarComFallback(loggerGlobal, contexto, ex),
+                msg => XtraMessageBox.Show(msg, TextosInicializacao.TituloApp, MessageBoxButtons.OK, MessageBoxIcon.Error));
+            tratador.Registrar();
             try
             {
                 var container = new Lazy<IContainer>(CompositionRoot.Construir);
@@ -78,8 +83,8 @@ namespace ERPFinanceiro.Desktop
                 // estado de erro F-1 (T-43) porque o mesmo banco está indisponível; nunca fecha silencioso.
                 IContainer raiz = container.Value;
                 IAppLogger logger = raiz.Resolve<IAppLogger>();
-                Action<string, Exception> registrar = (contexto, ex) =>
-                    logger.Registrar(contexto + ": " + ex, Guid.NewGuid().ToString("N"));
+                loggerGlobal = logger;
+                Action<string, Exception> registrar = (contexto, ex) => RegistrarComFallback(logger, contexto, ex);
 
                 var detalhe = new DetalheVendaPresenter(
                     DetalheVendaPresenter.CarregadorViaContainer(raiz), ex => registrar("Falha ao carregar detalhe da venda (F-3)", ex));
@@ -111,6 +116,24 @@ namespace ERPFinanceiro.Desktop
             {
                 host?.Stop();
                 instancia?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// RL10-02 (b): o container (e o TraceLogger) já pode ter sido descartado quando falha o passo do
+        /// mutex; nesse caso a falha vai para o Trace do sistema em vez de se perder.
+        /// </summary>
+        internal static void RegistrarComFallback(IAppLogger logger, string contexto, Exception ex)
+        {
+            string texto = contexto + ": " + ex;
+            try
+            {
+                if (logger == null) throw new InvalidOperationException("logger indisponível");
+                logger.Registrar(texto, Guid.NewGuid().ToString("N"));
+            }
+            catch (Exception)
+            {
+                try { System.Diagnostics.Trace.TraceError(texto); } catch (Exception) { }
             }
         }
 
